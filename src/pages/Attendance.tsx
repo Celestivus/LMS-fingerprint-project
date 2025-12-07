@@ -68,8 +68,7 @@ const ProfessorAttendanceView: React.FC = () => {
                      <h1 className="text-3xl font-bold">Inha University in Tashkent</h1>
                      <button 
                         onClick={handleStartMarking}
-                        className={`${markingMode ? 'bg-red-500 hover:bg-red-600' : 'bg-[#10b981] hover:bg-[#059669]'} text-white font-bold py-3 px-6 rounded shadow-md transition-colors`}
-                     >
+                        className={`${markingMode ? 'bg-red-500 hover:bg-red-600' : 'bg-[#10b981] hover:bg-[#059669]'} text-white font-bold py-3 px-6 rounded shadow-md transition-colors`}>
                         {markingMode ? 'Finish marking attendance' : 'Start marking attendance'}
                      </button>
                 </div>

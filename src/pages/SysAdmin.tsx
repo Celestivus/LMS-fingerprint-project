@@ -7,10 +7,7 @@ export const SysAdmin: React.FC = () => {
         <div className="text-center">
             <Database size={64} className="mx-auto mb-6 opacity-20" />
             <h1 className="text-2xl font-bold mb-2">SQL DATABASE VIEW</h1>
-            <p className="text-sm border-t border-gray-800 pt-4 mt-2">
-                [ EMPTY_CONNECTION_POOL ]<br/>
-                Waiting for implementation...
-            </p>
+
         </div>
     </div>
   );

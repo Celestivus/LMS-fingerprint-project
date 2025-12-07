@@ -14,8 +14,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock Login Logic
+
     let user: User;
     
     if (id.startsWith('U')) {
@@ -49,7 +48,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             role: UserRole.SYS_ADMIN,
         };
     } else {
-        // Default fallback for demo
+        // default user
         user = {
             id: id || 'U2310008',
             name: 'Demo User',

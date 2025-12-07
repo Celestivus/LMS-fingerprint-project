@@ -14,7 +14,7 @@ const MOCK_STUDENTS_FULL: User[] = studentsData.map(s => ({
 export const StudentListAdmin: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-white">
-         {/* Header */}
+        {/* Header */}
          <div className="flex items-center justify-between px-8 py-6 border-b-4 border-black">
             <h1 className="text-4xl font-bold">Student list - CSE 23-01</h1>
          </div>

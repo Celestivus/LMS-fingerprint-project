@@ -30,16 +30,6 @@ function createWindow() {
 ipcMain.on('biolink:start-scan', (event) => {
   console.log('[Hardware] Received request to start scanner...');
 
-  // 1. Initialize Driver
-  // try {
-  //    const ffi = require('ffi-napi');
-  //    const bioLib = ffi.Library('path/to/BioLinkSDK', { ...methods });
-  //    bioLib.Init();
-  // } catch (e) { ... }
-
-  // SIMULATION: Since we don't have the physical USB device in this environment,
-  // we simulate the hardware lifecycle of the U-Match scanner.
-
   // Step 1: Device Initialization (500ms)
   setTimeout(() => {
     if (mainWindow) {

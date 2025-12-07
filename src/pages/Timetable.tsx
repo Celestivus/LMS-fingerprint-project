@@ -56,12 +56,11 @@ export const Timetable: React.FC<TimetableProps> = ({ user }) => {
                 ))}
             </div>
 
-            {/* Day Rows */}
+
             {DAYS.map((day, dayIdx) => (
                 <div
                     key={day}
-                    className={`flex border-b border-gray-200 h-24 relative ${dayIdx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`}
-                >
+                    className={`flex border-b border-gray-200 h-24 relative ${dayIdx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`}>
                     <div className="w-32 flex-shrink-0 flex items-center justify-center font-medium text-gray-500 border-r border-gray-200">
                         {day}
                     </div>
