@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { NavBar } from './components/NavBar';
 import { Dashboard } from './pages/Dashboard';
@@ -11,13 +11,24 @@ import { SysAdmin } from './pages/SysAdmin';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { User, UserRole } from './types';
+import { connectWS, getWS } from './ws.ts';
 
 const AppContent: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const navigate = useNavigate();
 
+    // useEffect(() => {
+    connectWS("10.88.53.128");
+    // return () => {
+    //     const ws = getWS();
+    //     if (ws) ws.close();
+    // };
+    // }, []);
+
+
     const handleLogin = (newUser: User) => {
         setUser(newUser);
+
         navigate('/');
     };
 
