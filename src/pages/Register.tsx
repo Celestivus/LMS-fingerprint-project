@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
 import { Eye, EyeOff, Upload } from 'lucide-react';
+import { getWS } from '../ws';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -37,11 +38,47 @@ export const Register: React.FC = () => {
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      alert("Registration successful! Please sign in.");
-      navigate('/login');
-  };
+  const toBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let fingerprintBase64 = null;
+
+    if (fileInputRef.current?.files && fileInputRef.current.files.length > 0) {
+        const file = fileInputRef.current.files[0];
+        fingerprintBase64 = await toBase64(file);
+    }
+
+    const ws = getWS();
+    console.log("WS state:", ws?.readyState);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const payload = {
+        type: "register",
+        role,
+        data: {
+            ...formData,
+            fingerprint: fingerprintBase64
+        }
+        };
+
+        ws.send(JSON.stringify(payload));
+        console.log("Sent registration data:", payload);
+    } else {
+        console.error("WebSocket not connected.");
+    }
+
+    alert("Registration successful! Please sign in.");
+    navigate('/login');
+    };
 
   return (
     <div className="min-h-screen bg-[#0f6cbd] flex items-center justify-center p-4 font-sans">

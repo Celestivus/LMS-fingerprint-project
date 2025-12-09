@@ -17,19 +17,13 @@ const AppContent: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        connectWS("10.88.53.128");
-
-    const interval = setInterval(() => {
-        const ws = getWS();
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send("Hello backend! This is a test message from React.");
-            clearInterval(interval);
-        }
-    }, 500); 
-
-        return () => clearInterval(interval);
-    }, []);
+    // useEffect(() => {
+    connectWS("10.88.53.128");
+    // return () => {
+    //     const ws = getWS();
+    //     if (ws) ws.close();
+    // };
+    // }, []);
 
 
     const handleLogin = (newUser: User) => {
