@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIMES = [
@@ -28,75 +27,104 @@ const INITIAL_EVENTS: ClassEvent[] = [
     { id: 7, name: 'History', day: 'Saturday', start: '11:30', end: '13:00', type: 'lecture' },
 ];
 
+const SECTIONS = ['ICE-23-01', 'ICE-23-02', 'CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
+
 interface TimetableProps {
     user?: User;
 }
 
 export const Timetable: React.FC<TimetableProps> = ({ user }) => {
   const [events] = useState<ClassEvent[]>(INITIAL_EVENTS);
+  const [selectedSection, setSelectedSection] = useState<string | null>(
+      user?.role === UserRole.ACADEMIC_AFFAIRS ? SECTIONS[0] : null
+  );
 
   return (
-    <div className="flex flex-col h-full bg-white p-4 overflow-auto">
-        <div className="flex justify-between items-center mb-6 px-4">
-             <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">Timetable</h1>
-             <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">SOCIE</h1>
-             <div className="text-right">
-                <div className="text-3xl font-bold text-gray-800">Inha University in Tashkent</div>
-             </div>
-        </div>
+    <div className="flex flex-col h-full bg-white relative">
+        <div className="flex-1 overflow-auto p-4 pb-28">
+            <div className="flex justify-between items-center mb-6 px-4">
+                 <div className="flex items-center gap-4">
+                     <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">
+                         Timetable {selectedSection ? `- ${selectedSection}` : ''}
+                     </h1>
+                 </div>
+                 <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">SOCIE</h1>
+                 <div className="text-right">
+                    <div className="text-3xl font-bold text-gray-800">Inha University in Tashkent</div>
+                 </div>
+            </div>
 
-        <div className="relative border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white">
-            {/* Header Row (Times) */}
-            <div className="flex border-b border-gray-200">
-                <div className="w-32 flex-shrink-0 bg-gray-50 border-r border-gray-200"></div>
-                {TIMES.map(time => (
-                    <div key={time} className="flex-1 text-center text-xs text-gray-400 py-2 border-r border-gray-100 last:border-0">
-                        {time}
+            <div className="relative border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white min-w-[1000px]">
+                {/* Header Row (Times) */}
+                <div className="flex border-b border-gray-200">
+                    <div className="w-32 flex-shrink-0 bg-gray-50 border-r border-gray-200"></div>
+                    {TIMES.map(time => (
+                        <div key={time} className="flex-1 text-center text-xs text-gray-400 py-2 border-r border-gray-100 last:border-0">
+                            {time}
+                        </div>
+                    ))}
+                </div>
+
+
+                {DAYS.map((day, dayIdx) => (
+                    <div
+                        key={day}
+                        className={`flex border-b border-gray-200 h-24 relative ${dayIdx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`}>
+                        <div className="w-32 flex-shrink-0 flex items-center justify-center font-medium text-gray-500 border-r border-gray-200">
+                            {day}
+                        </div>
+
+                        <div className="flex-1 flex relative">
+                            {TIMES.map(time => (
+                                <div key={time} className="flex-1 border-r border-gray-100 last:border-0 h-full"></div>
+                            ))}
+
+                            {events.filter(e => e.day === day).map((event) => {
+                                const startIndex = TIMES.indexOf(event.start);
+                                const endIndex = TIMES.indexOf(event.end);
+                                if (startIndex === -1) return null;
+
+                                const widthPercent = ((endIndex - startIndex) / TIMES.length) * 100;
+                                const leftPercent = (startIndex / TIMES.length) * 100;
+
+                                return (
+                                    <div
+                                        key={event.id}
+                                        className={`absolute top-2 bottom-2 rounded-lg text-white shadow-md flex flex-col items-center justify-center p-2 text-center hover:scale-[1.02] transition-transform z-10 cursor-default
+                                            ${event.type === 'lecture' ? 'bg-[#5aaeb1]' : 'bg-[#eab308]'}`}
+                                        style={{
+                                            left: `${leftPercent}%`,
+                                            width: `${widthPercent}%`
+                                        }}>
+                                        <span className="font-bold text-sm leading-tight">{event.name}</span>
+                                        <span className="text-[10px] opacity-90 mt-1">{event.type}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 ))}
             </div>
-
-
-            {DAYS.map((day, dayIdx) => (
-                <div
-                    key={day}
-                    className={`flex border-b border-gray-200 h-24 relative ${dayIdx % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`}>
-                    <div className="w-32 flex-shrink-0 flex items-center justify-center font-medium text-gray-500 border-r border-gray-200">
-                        {day}
-                    </div>
-
-                    <div className="flex-1 flex relative">
-                        {TIMES.map(time => (
-                            <div key={time} className="flex-1 border-r border-gray-100 last:border-0 h-full"></div>
-                        ))}
-
-                        {events.filter(e => e.day === day).map((event) => {
-                            const startIndex = TIMES.indexOf(event.start);
-                            const endIndex = TIMES.indexOf(event.end);
-                            if (startIndex === -1) return null;
-
-                            const widthPercent = ((endIndex - startIndex) / TIMES.length) * 100;
-                            const leftPercent = (startIndex / TIMES.length) * 100;
-
-                            return (
-                                <div
-                                    key={event.id}
-                                    className={`absolute top-2 bottom-2 rounded-lg text-white shadow-md flex flex-col items-center justify-center p-2 text-center hover:scale-[1.02] transition-transform z-10 cursor-default
-                                        ${event.type === 'lecture' ? 'bg-[#5aaeb1]' : 'bg-[#eab308]'}`}
-                                    style={{
-                                        left: `${leftPercent}%`,
-                                        width: `${widthPercent}%`
-                                    }}
-                                >
-                                    <span className="font-bold text-sm leading-tight">{event.name}</span>
-                                    <span className="text-[10px] opacity-90 mt-1">{event.type}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            ))}
         </div>
+
+        {user?.role === UserRole.ACADEMIC_AFFAIRS && (
+            <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center z-50">
+                <div className="bg-white border border-gray-200 shadow-lg rounded-full p-2 flex gap-3">
+                    {SECTIONS.map(section => (
+                        <button
+                            key={section}
+                            onClick={() => setSelectedSection(section)}
+                            className={`px-5 py-2 rounded-full border text-sm font-bold transition-all
+                                ${selectedSection === section
+                                    ? 'bg-white text-gray-800 border-gray-300 shadow-inner ring-1 ring-gray-200' 
+                                    : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300 hover:text-gray-600'
+                                }`}>
+                            {section}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
     </div>
   );
 };
