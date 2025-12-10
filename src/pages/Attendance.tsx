@@ -4,6 +4,7 @@ import { User, UserRole } from '../types';
 import { Upload } from 'lucide-react';
 import { FingerprintScanner } from './FingerprintScanner';
 import { studentsData } from '../students';
+import { getWS } from '../ws';
 
 interface AttendanceProps {
   user: User;
@@ -170,8 +171,17 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         }
         alert(`Medical certificate '${fileName}' submitted to Professor and Academic Affairs.`);
         setPopupSlot(null);
-    };
 
+        const ws = getWS();
+        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const payload = {
+                file: "submit_med_cert",
+            };
+    
+            ws.send(JSON.stringify(payload));
+        };
+    }
     return (
         <div className="flex flex-col h-full bg-white relative">
             {/* Popover for Medical Certificate */}

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Email } from '../types';
 import { Mail, Trash2, Star, ChevronDown, Check, X } from 'lucide-react';
+import { getWS } from '../ws';
 
 const MOCK_EMAILS: Email[] = [
   { id: '1', sender: 'Medical certification', subject: 'Day before', preview: 'Let down and hanging around crushed like a bug in the ground', content: 'See attached.', date: 'Mon', time: '8:40', isRead: false, folder: 'inbox' },
@@ -11,10 +12,29 @@ const MOCK_EMAILS: Email[] = [
 ];
 
 export const Inbox: React.FC = () => {
+  const ws = getWS();
+
   const [selectedFolder, setSelectedFolder] = useState<'inbox' | 'drafts' | 'sent' | 'spam'>('inbox');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
   const filteredEmails = MOCK_EMAILS.filter(e => e.folder === selectedFolder);
+  useEffect(() => {
+        if (!ws) return;
+
+        ws.onmessage = (event) => {
+            console.log("Received:", event.data);
+
+            let data;
+            try {
+                data = JSON.parse(event.data); 
+            } catch {
+                data = event.data;
+            }
+
+        };
+
+        return () => ws.close();
+    }, [ws]);
 
   // Render logic for the specific "Medical Certification" email type
   const renderEmailContent = (email: Email) => {
