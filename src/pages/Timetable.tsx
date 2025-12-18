@@ -1,43 +1,18 @@
+
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const TIMES = [
-    '09:30', '10:00', '10:30', '11:00', '11:30', '12:00',
-    '12:30', '13:00', '13:30', '14:00', '14:30', '15:00',
-    '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
-];
-
-interface ClassEvent {
-    id: number;
-    name: string;
-    day: string;
-    start: string;
-    end: string;
-    type: string;
-}
-
-const INITIAL_EVENTS: ClassEvent[] = [
-    { id: 1, name: 'Operating System', day: 'Monday', start: '09:30', end: '11:00', type: 'lecture' },
-    { id: 2, name: 'Database Systems', day: 'Tuesday', start: '11:30', end: '13:00', type: 'lecture' },
-    { id: 3, name: 'Web Engineering', day: 'Tuesday', start: '14:00', end: '15:30', type: 'lecture' },
-    { id: 4, name: 'Operating System', day: 'Wednesday', start: '09:30', end: '11:00', type: 'lab' },
-    { id: 5, name: 'Calculus I', day: 'Thursday', start: '13:00', end: '14:30', type: 'lecture' },
-    { id: 6, name: 'Physics', day: 'Friday', start: '14:00', end: '17:00', type: 'lab' },
-    { id: 7, name: 'History', day: 'Saturday', start: '11:30', end: '13:00', type: 'lecture' },
-];
-
-const SECTIONS = ['ICE-23-01', 'ICE-23-02', 'CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
+import { User, UserRole, SECTIONS } from '../types';
+import { SECTION_EVENTS, DAYS, TIMES } from '../students';
 
 interface TimetableProps {
-    user?: User;
+    user: User;
 }
 
 export const Timetable: React.FC<TimetableProps> = ({ user }) => {
-  const [events] = useState<ClassEvent[]>(INITIAL_EVENTS);
-  const [selectedSection, setSelectedSection] = useState<string | null>(
-      user?.role === UserRole.ACADEMIC_AFFAIRS ? SECTIONS[0] : null
+  const [selectedSection, setSelectedSection] = useState<string>(
+      user.role === UserRole.ACADEMIC_AFFAIRS ? SECTIONS[0] : 'CSE-23-01'
   );
+
+  const events = SECTION_EVENTS[selectedSection] || [];
 
   return (
     <div className="flex flex-col h-full bg-white relative">
@@ -45,7 +20,7 @@ export const Timetable: React.FC<TimetableProps> = ({ user }) => {
             <div className="flex justify-between items-center mb-6 px-4">
                  <div className="flex items-center gap-4">
                      <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">
-                         Timetable {selectedSection ? `- ${selectedSection}` : ''}
+                         Timetable - {selectedSection}
                      </h1>
                  </div>
                  <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">SOCIE</h1>
@@ -107,24 +82,21 @@ export const Timetable: React.FC<TimetableProps> = ({ user }) => {
             </div>
         </div>
 
-        {user?.role === UserRole.ACADEMIC_AFFAIRS && (
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center z-50">
-                <div className="bg-white border border-gray-200 shadow-lg rounded-full p-2 flex gap-3">
-                    {SECTIONS.map(section => (
-                        <button
-                            key={section}
-                            onClick={() => setSelectedSection(section)}
-                            className={`px-5 py-2 rounded-full border text-sm font-bold transition-all
-                                ${selectedSection === section
-                                    ? 'bg-white text-gray-800 border-gray-300 shadow-inner ring-1 ring-gray-200' 
-                                    : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300 hover:text-gray-600'
-                                }`}>
-                            {section}
-                        </button>
-                    ))}
-                </div>
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center z-50">
+            <div className="bg-white border border-gray-200 shadow-lg rounded-full p-2 flex gap-3 overflow-x-auto max-w-[90%] scrollbar-hide">
+                {SECTIONS.map(section => (
+                    <button
+                        key={section}
+                        onClick={() => setSelectedSection(section)}
+                        className={`px-5 py-2 rounded-full border text-sm font-bold transition-all whitespace-nowrap
+                            ${selectedSection === section
+                                ? 'bg-black text-white border-black shadow-inner' 
+                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300 hover:text-gray-600'}`}>
+                        {section}
+                    </button>
+                ))}
             </div>
-        )}
+        </div>
     </div>
   );
 };

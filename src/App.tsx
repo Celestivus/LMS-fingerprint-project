@@ -18,7 +18,7 @@ const AppContent: React.FC = () => {
     const navigate = useNavigate();
 
     // useEffect(() => {
-    connectWS("192.168.0.16");
+    connectWS("10.175.90.1");
     // return () => {
     //     const ws = getWS();
     //     if (ws) ws.close();
@@ -58,10 +58,7 @@ const AppContent: React.FC = () => {
                         <Dashboard />
                     } />
                     <Route path="/inbox" element={<Inbox />} />
-                    
-                    {/* Timetable is now dynamic based on user role for editing */}
                     <Route path="/timetable" element={<Timetable user={user} />} />
-
                     <Route path="/attendance" element={<Attendance user={user} />} />
                     <Route path="/professor-list" element={<ProfessorList />} />
                     <Route path="/student-list" element={<StudentListAdmin />} />

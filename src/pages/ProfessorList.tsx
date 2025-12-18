@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
 
-// Mock Data
-const DEPARTMENTS = ['LOG/BUS', 'SOCIE', 'BM', 'MBA', 'IT', 'EMBA'];
+const DEPARTMENTS = ['LOG', 'SOCIE', 'BUS'];
 
 const MOCK_PROFESSORS: User[] = [
     { id: 'U140001', name: 'Angelina Saydasheva', role: UserRole.PROFESSOR, email: 'a.saydasheva@student.inha.uz', department: 'SOCIE' },
@@ -26,8 +25,7 @@ export const ProfessorList: React.FC = () => {
                       <button 
                         key={dept}
                         onClick={() => setSelectedDept(dept)}
-                        className="bg-[#2d2d2d] text-white py-12 text-xl font-medium rounded-lg shadow-xl hover:bg-black hover:scale-105 transition-all"
-                      >
+                        className="bg-[#2d2d2d] text-white py-12 text-xl font-medium rounded-lg shadow-xl hover:bg-black hover:scale-105 transition-all">
                           {dept}
                       </button>
                   ))}
@@ -36,7 +34,7 @@ export const ProfessorList: React.FC = () => {
       );
   }
 
-  const filteredProfs = MOCK_PROFESSORS.filter(p => p.department === selectedDept || !p.department); // Fallback to show some if dept missing
+  const filteredProfs = MOCK_PROFESSORS.filter(p => p.department === selectedDept || !p.department);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -47,8 +45,7 @@ export const ProfessorList: React.FC = () => {
             </h1>
             <button 
                 onClick={() => setSelectedDept(null)}
-                className="bg-[#2d2d2d] text-white px-6 py-2 rounded font-bold hover:bg-black"
-            >
+                className="bg-[#2d2d2d] text-white px-6 py-2 rounded font-bold hover:bg-black">
                 Back to Departments
             </button>
          </div>

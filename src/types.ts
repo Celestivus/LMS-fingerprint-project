@@ -40,3 +40,7 @@ export interface AttendanceRecord {
   studentName: string;
   weeks: boolean[];
 }
+export const SECTIONS = [
+  'ICE-23-01', 'ICE-23-02', 'CSE-23-01', 'CSE-23-02',
+  'CSE-23-03', 'LOG-23-01','LOG-23-02','BUS-23-01','BUS-23-02'
+];

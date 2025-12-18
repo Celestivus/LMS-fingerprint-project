@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { User, UserRole } from '../types';
 import { Upload } from 'lucide-react';
@@ -131,14 +132,14 @@ const ProfessorAttendanceView: React.FC = () => {
                     <div className="bg-white">
                         {PROF_VIEW_STUDENTS.map((student) => (
                             <div key={student.id} className="flex border-b border-black h-12 hover:bg-slate-50 group">
-                                <div className="sticky left-0 w-64 flex shrink-0 border-r-2 border-black bg-white z-30 group-hover:bg-slate-50">
+                                <div className="sticky left-0 w-64 flex shrink-0 border-r-2 border-black bg-white z-30 group-hover:bg-slate-50 h-full">
                                     <div className="w-1/2 p-2 text-xs font-bold border-r border-gray-300 flex items-center justify-center text-center leading-tight">
                                         {student.name}
                                     </div>
                                     <div className="w-1/2 p-2 text-xs font-semibold flex items-center justify-center">{student.id}</div>
                                 </div>
 
-                                <div className="flex">
+                                <div className="flex h-full">
                                     {SESSIONS.map(session => {
                                         const key = `${student.id}-${session.label}`;
                                         const isAbsent = attendanceData[key];
@@ -148,18 +149,17 @@ const ProfessorAttendanceView: React.FC = () => {
                                         <div
                                             key={session.id}
                                             onClick={() => toggleAttendance(student.id, session.label)}
-                                            className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center transition-colors
+                                            className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center transition-colors h-full
                                                 ${isActiveColumn 
                                                     ? (markingMode ? 'bg-white cursor-pointer hover:bg-red-50' : 'bg-blue-50 cursor-default') 
                                                     : 'bg-gray-50 opacity-50'}
-                                                ${isAbsent ? 'bg-red-200 !opacity-100' : ''}`}
-                                        >
+                                                ${isAbsent ? 'bg-red-200 !opacity-100' : ''}`}>
                                             {isAbsent && <span className="text-red-600 font-bold">A</span>}
                                         </div>
                                     )})}
                                 </div>
 
-                                <div className="sticky right-0 w-32 shrink-0 flex items-center justify-center font-bold text-lg border-l-2 border-black bg-white z-30 group-hover:bg-slate-50">
+                                <div className="sticky right-0 w-32 shrink-0 flex items-center justify-center font-bold text-lg border-l-2 border-black bg-white z-30 group-hover:bg-slate-50 h-full">
                                         {student.absences + Object.keys(attendanceData).filter(k => k.startsWith(student.id)).length}
                                 </div>
                             </div>
@@ -205,12 +205,10 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         }
 
         const ws = getWS();
-
         if (ws && ws.readyState === WebSocket.OPEN) {
             const payload = {
                 file: "submit_med_cert",
             };
-
             ws.send(JSON.stringify(payload));
         }
 

@@ -8,6 +8,22 @@ export interface StudentRecord {
   absences: number;
 }
 
+export interface ClassEvent {
+    id: number;
+    name: string;
+    day: string;
+    start: string;
+    end: string;
+    type: string;
+}
+
+export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const TIMES = [
+    '09:30', '10:00', '10:30', '11:00', '11:30', '12:00',
+    '12:30', '13:00', '13:30', '14:00', '14:30', '15:00',
+    '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
+];
+
 export const studentsData: StudentRecord[] = [
   { "id": "U2310002", "name": "ABBOSOV MUXAMMADYOSIN", "role": "STUDENT", "group": "CSE 23-01", "email": "a.muxammadyosin@student.inha.uz", "absences": 0 },
   { "id": "U2310003", "name": "ABDUGANIYEV ABDUVORIS", "role": "STUDENT", "group": "CSE 23-01", "email": "a.abduvoris@student.inha.uz", "absences": 1 },
@@ -70,4 +86,34 @@ export const studentsData: StudentRecord[] = [
   { "id": "U2310061", "name": "BOZOROV ARSLONBEK", "role": "STUDENT", "group": "CSE 23-01", "email": "b.arslonbek@student.inha.uz", "absences": 0 },
   { "id": "U2310062", "name": "BOZOROV ASADBEK", "role": "STUDENT", "group": "CSE 23-01", "email": "b.asadbek@student.inha.uz", "absences": 0 }
 ];
-    
+
+export const SECTION_EVENTS: Record<string, ClassEvent[]> = {
+    'ICE-23-01': [
+        { id: 101, name: 'Intro to ICE', day: 'Monday', start: '10:00', end: '11:30', type: 'lecture' },
+        { id: 102, name: 'Electronics Lab', day: 'Wednesday', start: '13:00', end: '16:00', type: 'lab' },
+    ],
+    'ICE-23-02': [
+        { id: 103, name: 'Digital Logic', day: 'Tuesday', start: '09:30', end: '11:00', type: 'lecture' },
+        { id: 104, name: 'Physics II', day: 'Thursday', start: '14:30', end: '16:00', type: 'lecture' },
+    ],
+    'CSE-23-01': [
+        { id: 1, name: 'Operating System', day: 'Monday', start: '09:30', end: '11:00', type: 'lecture' },
+        { id: 2, name: 'Database Systems', day: 'Tuesday', start: '11:30', end: '13:00', type: 'lecture' },
+        { id: 3, name: 'Computer Algorithm', day: 'Tuesday', start: '14:00', end: '15:30', type: 'lecture' },
+        { id: 4, name: 'Operating System', day: 'Wednesday', start: '09:30', end: '11:00', type: 'lab' },
+        { id: 5, name: 'Engineering Communications', day: 'Thursday', start: '13:00', end: '14:30', type: 'lecture' },
+        { id: 6, name: 'System Analysis', day: 'Friday', start: '14:00', end: '17:00', type: 'lab' },
+    ],
+    'CSE-23-02': [
+        { id: 201, name: 'Data Structures', day: 'Monday', start: '11:00', end: '12:30', type: 'lecture' },
+        { id: 202, name: 'Discrete Math', day: 'Wednesday', start: '14:00', end: '15:30', type: 'lecture' },
+    ],
+    'LOG-23-01': [
+        { id: 301, name: 'Logistics Mgmt', day: 'Tuesday', start: '09:30', end: '11:00', type: 'lecture' },
+        { id: 302, name: 'Supply Chain Lab', day: 'Thursday', start: '10:00', end: '12:00', type: 'lab' },
+    ],
+    'BUS-23-01': [
+        { id: 401, name: 'Business Ethics', day: 'Monday', start: '14:00', end: '15:30', type: 'lecture' },
+        { id: 402, name: 'Macroeconomics', day: 'Friday', start: '10:00', end: '11:30', type: 'lecture' },
+    ]
+};
