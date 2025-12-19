@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { User, UserRole } from '../types';
-import { Upload } from 'lucide-react';
+import { User, UserRole, SECTIONS } from '../types';
+import { Upload, ChevronDown } from 'lucide-react';
 import { studentsData } from '../students';
 import { FingerprintScanner } from './FingerprintScanner';
 import { getWS } from '../ws';
@@ -16,28 +16,23 @@ const SESSIONS = WEEKS.flatMap(week => [
     { id: `${week}-2`, label: `${week}.2` }
 ]);
 
-const PROF_VIEW_STUDENTS = studentsData.map(s => ({
-    id: s.id,
-    name: s.name,
-    absences: s.absences
-}));
-
-const STUDENT_VIEW_COURSES = [
-    { name: 'Database', absences: [3] },
-    { name: 'Operating System', absences: [] },
-    { name: 'System Analysis', absences: [14] },
-    { name: 'Engineering Communications', absences: [] },
-    { name: 'Computer Algorithm', absences: [] },
-    { name: 'History', absences: [] },
-    { name: 'Academic English', absences: [] },
-    { name: 'Java Programming', absences: [] },
-];
-
 const ProfessorAttendanceView: React.FC = () => {
     const [markingMode, setMarkingMode] = useState(false);
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
     const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>({});
     const [showScanner, setShowScanner] = useState(false);
+    const [currentSection, setCurrentSection] = useState('CSE-23-01');
+    const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
+
+    const PROF_VIEW_STUDENTS = studentsData
+        .filter(s => s.group === currentSection)
+        .map(s => ({
+            id: s.id,
+            name: s.name,
+            absences: s.absences
+        }));
+
+    const allowedSections = ['CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
 
     const toggleAttendance = (studentId: string, sessionLabel: string) => {
         if (!markingMode) return;
@@ -78,10 +73,34 @@ const ProfessorAttendanceView: React.FC = () => {
     return (
         <div className="flex flex-col h-full bg-white relative">
             {showScanner && <FingerprintScanner onComplete={handleScanComplete} />}
-            <div className="flex border-b-4 border-black shrink-0 z-20 relative bg-white">
-                <div className="w-1/4 p-4 border-r-4 border-black">
-                    <h1 className="text-3xl font-bold">Course name</h1>
-                    <h2 className="text-2xl font-bold text-gray-700">Section 001</h2>
+            <div className="flex border-b-4 border-black shrink-0 z-[80] relative bg-white">
+                <div className="w-1/4 p-4 border-r-4 border-black relative">
+                    <div
+                        className="cursor-pointer flex items-center justify-between group"
+                        onClick={() => setIsSectionMenuOpen(!isSectionMenuOpen)}
+                    >
+                        <div>
+                            <h1 className="text-3xl font-bold">Course name</h1>
+                            <h2 className="text-2xl font-bold text-gray-700">{currentSection}</h2>
+                        </div>
+                        <ChevronDown className={`transition-transform ${isSectionMenuOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isSectionMenuOpen && (
+                        <div className="absolute top-full left-0 w-full bg-white border-x-4 border-b-4 border-black z-[90] shadow-xl">
+                            {allowedSections.map(section => (
+                                <div
+                                    key={section}
+                                    onClick={() => {
+                                        setCurrentSection(section);
+                                        setIsSectionMenuOpen(false);
+                                    }}
+                                    className={`p-4 hover:bg-slate-100 font-bold cursor-pointer border-b border-gray-200 last:border-0 ${currentSection === section ? 'bg-slate-100' : ''}`}>
+                                    {section}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 p-4 flex justify-between items-center bg-white">
                      <h1 className="text-3xl font-bold">Inha University in Tashkent</h1>
@@ -223,8 +242,7 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                     <div className="fixed inset-0 z-40" onClick={() => setPopupSlot(null)}></div>
                     <div
                         className="absolute z-50 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 rounded-lg w-80 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-200"
-                        style={{ top: popupSlot.top + 10, left: Math.max(10, popupSlot.left) }}
-                    >
+                        style={{ top: popupSlot.top + 10, left: Math.max(10, popupSlot.left) }}>
                         <div className="text-sm font-bold text-center">
                             Upload your medical certificate
                         </div>
@@ -314,6 +332,17 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         </div>
     );
 };
+
+const STUDENT_VIEW_COURSES = [
+    { name: 'Database', absences: [3] },
+    { name: 'Operating System', absences: [] },
+    { name: 'System Analysis', absences: [14] },
+    { name: 'Engineering Communications', absences: [] },
+    { name: 'Computer Algorithm', absences: [] },
+    { name: 'History', absences: [] },
+    { name: 'Academic English', absences: [] },
+    { name: 'Java Programming', absences: [] },
+];
 
 export const Attendance: React.FC<AttendanceProps> = ({ user }) => {
     if (user.role === UserRole.STUDENT) {

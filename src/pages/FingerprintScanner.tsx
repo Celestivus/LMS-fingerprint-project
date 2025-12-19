@@ -6,6 +6,7 @@ interface FingerprintScannerProps {
 
 export const FingerprintScanner: React.FC<FingerprintScannerProps> = ({ onComplete }) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [fileCount, setFileCount] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleUploadClick = () => {
@@ -14,11 +15,11 @@ export const FingerprintScanner: React.FC<FingerprintScannerProps> = ({ onComple
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
+            setFileCount(e.target.files.length);
             setIsProcessing(true);
-            // Simulate verification delay
             setTimeout(() => {
                 onComplete();
-            }, 1500);
+            }, 2000);
         }
     }
 
@@ -61,13 +62,14 @@ export const FingerprintScanner: React.FC<FingerprintScannerProps> = ({ onComple
                       ref={fileInputRef}
                       onChange={handleFileChange}
                       className="hidden"
-                      accept="image/*"/>
+                      accept="image/*"
+                      multiple />
 
                   <button
                     onClick={handleUploadClick}
                     disabled={isProcessing}
                     className="bg-[#10b981] hover:bg-[#059669] text-white font-bold py-3 px-12 rounded shadow-sm text-lg transition-colors min-w-[300px]" >
-                    {isProcessing ? 'Verifying...' : 'Upload your fingerprint'}
+                    {isProcessing ? `Verifying ${fileCount} scan...` : 'Upload fingerprint'}
                   </button>
              </div>
         </div>
