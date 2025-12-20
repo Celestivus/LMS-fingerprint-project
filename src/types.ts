@@ -19,7 +19,6 @@ export interface Course {
   id: string;
   code: string;
   name: string;
-  section: string;
   schedule?: string;
 }
 
@@ -32,7 +31,7 @@ export interface Email {
   date: string;
   time: string;
   isRead: boolean;
-  folder: 'inbox' | 'drafts' | 'sent' | 'spam';
+  folder: 'inbox';
 }
 
 export interface AttendanceRecord {

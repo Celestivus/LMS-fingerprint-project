@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { User, UserRole, SECTIONS } from '../types';
 import { Upload, ChevronDown } from 'lucide-react';
@@ -9,6 +8,17 @@ import { getWS } from '../ws';
 interface AttendanceProps {
   user: User;
 }
+
+const STUDENT_VIEW_COURSES = [
+    { name: 'Database', absences: [3] },
+    { name: 'Operating System', absences: [] },
+    { name: 'System Analysis', absences: [14] },
+    { name: 'Engineering Communications', absences: [] },
+    { name: 'Computer Algorithm', absences: [] },
+    { name: 'History 2', absences: [] },
+    { name: 'Academic English', absences: [] },
+];
+
 const WEEKS = Array.from({ length: 15 }, (_, i) => i + 1);
 
 const SESSIONS = WEEKS.flatMap(week => [
@@ -21,6 +31,10 @@ const ProfessorAttendanceView: React.FC = () => {
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
     const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>({});
     const [showScanner, setShowScanner] = useState(false);
+
+    const [currentCourse, setCurrentCourse] = useState(STUDENT_VIEW_COURSES[0].name);
+    const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
+
     const [currentSection, setCurrentSection] = useState('CSE-23-01');
     const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
 
@@ -74,20 +88,55 @@ const ProfessorAttendanceView: React.FC = () => {
         <div className="flex flex-col h-full bg-white relative">
             {showScanner && <FingerprintScanner onComplete={handleScanComplete} />}
             <div className="flex border-b-4 border-black shrink-0 z-[80] relative bg-white">
+                {/* Course Selection */}
                 <div className="w-1/4 p-4 border-r-4 border-black relative">
                     <div
-                        className="cursor-pointer flex items-center justify-between group"
-                        onClick={() => setIsSectionMenuOpen(!isSectionMenuOpen)}
-                    >
+                        className="cursor-pointer flex items-center justify-between group h-full"
+                        onClick={() => {
+                            setIsCourseMenuOpen(!isCourseMenuOpen);
+                            setIsSectionMenuOpen(false);
+                        }}>
                         <div>
-                            <h1 className="text-3xl font-bold">Course name</h1>
-                            <h2 className="text-2xl font-bold text-gray-700">{currentSection}</h2>
+                            <h1 className="text-sm font-black uppercase text-gray-400 tracking-widest">Select Course</h1>
+                            <h2 className="text-2xl font-bold text-black group-hover:text-blue-600 transition-colors leading-tight">{currentCourse}</h2>
                         </div>
-                        <ChevronDown className={`transition-transform ${isSectionMenuOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`transition-transform flex-shrink-0 ml-2 ${isCourseMenuOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isCourseMenuOpen && (
+                        <div className="absolute top-full left-0 w-full bg-white border-x-4 border-b-4 border-black z-[100] shadow-2xl max-h-80 overflow-y-auto">
+                            {STUDENT_VIEW_COURSES.map(course => (
+                                <div
+                                    key={course.name}
+                                    onClick={() => {
+                                        setCurrentCourse(course.name);
+                                        setIsCourseMenuOpen(false);
+                                    }}
+                                    className={`p-4 hover:bg-slate-100 font-bold cursor-pointer border-b border-gray-100 last:border-0 ${currentCourse === course.name ? 'bg-slate-100 text-[#0066cc]' : ''}`}>
+                                    {course.name}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Section Selection */}
+                <div className="w-1/4 p-4 border-r-4 border-black relative bg-slate-50">
+                    <div
+                        className="cursor-pointer flex items-center justify-between group h-full"
+                        onClick={() => {
+                            setIsSectionMenuOpen(!isSectionMenuOpen);
+                            setIsCourseMenuOpen(false);
+                        }}>
+                        <div>
+                            <h1 className="text-sm font-black uppercase text-gray-400 tracking-widest">Select Section</h1>
+                            <h2 className="text-2xl font-bold text-gray-700 group-hover:text-black transition-colors">{currentSection}</h2>
+                        </div>
+                        <ChevronDown className={`transition-transform flex-shrink-0 ml-2 ${isSectionMenuOpen ? 'rotate-180' : ''}`} />
                     </div>
 
                     {isSectionMenuOpen && (
-                        <div className="absolute top-full left-0 w-full bg-white border-x-4 border-b-4 border-black z-[90] shadow-xl">
+                        <div className="absolute top-full left-0 w-full bg-white border-x-4 border-b-4 border-black z-[100] shadow-2xl">
                             {allowedSections.map(section => (
                                 <div
                                     key={section}
@@ -95,32 +144,33 @@ const ProfessorAttendanceView: React.FC = () => {
                                         setCurrentSection(section);
                                         setIsSectionMenuOpen(false);
                                     }}
-                                    className={`p-4 hover:bg-slate-100 font-bold cursor-pointer border-b border-gray-200 last:border-0 ${currentSection === section ? 'bg-slate-100' : ''}`}>
+                                    className={`p-4 hover:bg-slate-100 font-bold cursor-pointer border-b border-gray-100 last:border-0 ${currentSection === section ? 'bg-slate-100 text-black' : ''}`}>
                                     {section}
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
+
                 <div className="flex-1 p-4 flex justify-between items-center bg-white">
-                     <h1 className="text-3xl font-bold">Inha University in Tashkent</h1>
-                        <button
-                            onClick={handleStartMarking}
-                            disabled={!selectedSession}
-                            className={`font-bold py-3 px-8 rounded shadow-md transition-all border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none
-                                ${markingMode 
-                                    ? 'bg-red-500 hover:bg-red-600 text-white' 
-                                    : !selectedSession 
-                                        ? 'bg-gray-200 text-gray-400 border-gray-300 shadow-none cursor-not-allowed' 
-                                        : 'bg-[#10b981] hover:bg-[#059669] text-white'}`}>
-                            {markingMode ? 'Finish marking attendance' : 'Start marking attendance'}
-                        </button>
-                     </div>
+                    <h1 className="text-3xl font-bold text-gray-800">Inha University in Tashkent</h1>
+                    <button
+                        onClick={handleStartMarking}
+                        disabled={!selectedSession}
+                        className={`font-bold py-3 px-8 rounded shadow-md transition-all border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none
+                                ${markingMode
+                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                            : !selectedSession
+                                ? 'bg-gray-200 text-gray-400 border-gray-300 shadow-none cursor-not-allowed'
+                                : 'bg-[#10b981] hover:bg-[#059669] text-white'}`}>
+                        {markingMode ? 'Finish marking attendance' : 'Start marking attendance'}
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-auto bg-gray-50/30">
                 <div className="min-w-max">
-                    <div className="flex sticky top-0 z-40 bg-gray-50 shadow-sm border-b-2 border-black h-16">
+                <div className="flex sticky top-0 z-40 bg-gray-50 shadow-sm border-b-2 border-black h-16">
                         <div className="sticky left-0 w-64 flex shrink-0 border-r-2 border-black bg-gray-50 z-50">
                             <div className="w-1/2 p-3 font-bold text-xl border-r-2 border-black flex items-center justify-center">Name</div>
                             <div className="w-1/2 p-3 font-bold text-xl flex items-center justify-center">ID</div>
@@ -139,8 +189,7 @@ const ProfessorAttendanceView: React.FC = () => {
                                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                                         Select
                                     </span>
-                                </div>
-                            ))}
+                                </div>))}
                         </div>
 
                         <div className="sticky right-0 w-32 shrink-0 p-3 font-bold text-sm text-center flex items-center justify-center border-l-2 border-black bg-gray-50 z-50">
@@ -163,7 +212,6 @@ const ProfessorAttendanceView: React.FC = () => {
                                         const key = `${student.id}-${session.label}`;
                                         const isAbsent = attendanceData[key];
                                         const isActiveColumn = selectedSession === session.id;
-
                                         return (
                                         <div
                                             key={session.id}
@@ -332,17 +380,6 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         </div>
     );
 };
-
-const STUDENT_VIEW_COURSES = [
-    { name: 'Database', absences: [3] },
-    { name: 'Operating System', absences: [] },
-    { name: 'System Analysis', absences: [14] },
-    { name: 'Engineering Communications', absences: [] },
-    { name: 'Computer Algorithm', absences: [] },
-    { name: 'History', absences: [] },
-    { name: 'Academic English', absences: [] },
-    { name: 'Java Programming', absences: [] },
-];
 
 export const Attendance: React.FC<AttendanceProps> = ({ user }) => {
     if (user.role === UserRole.STUDENT) {

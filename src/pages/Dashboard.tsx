@@ -2,11 +2,11 @@ import React from 'react';
 import { Course } from '../types';
 
 const MOCK_COURSES: Course[] = [
-  { id: '1', code: 'SOC3010', name: 'Operating System', section: '001' },
-  { id: '2', code: 'CSE3020', name: 'Database Systems', section: '002' },
-  { id: '3', code: 'ICE2010', name: 'Computer Architecture', section: '001' },
-  { id: '4', code: 'MAT1010', name: 'Calculus I', section: '003' },
-  { id: '5', code: 'PHY1010', name: 'General Physics', section: '001' },
+  { id: '1', code: 'SOC3010', name: 'Operating System'},
+  { id: '2', code: 'CSE3020', name: 'Database Systems'},
+  { id: '3', code: 'ICE2010', name: 'Computer Architecture'},
+  { id: '4', code: 'MAT1010', name: 'Calculus I'},
+  { id: '5', code: 'PHY1010', name: 'General Physics'},
 ];
 
 export const Dashboard: React.FC = () => {
@@ -21,7 +21,7 @@ export const Dashboard: React.FC = () => {
               {course.code}
             </div>
             <div className="flex-1 border-4 border-black px-10 py-8 font-bold text-3xl bg-white group-hover:bg-slate-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:shadow-none">
-              <span>{course.name} - [Section {course.section}]</span>
+              <span>{course.name}</span>
             </div>
           </div>
         ))}

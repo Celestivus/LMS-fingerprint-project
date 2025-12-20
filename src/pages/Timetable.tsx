@@ -23,7 +23,6 @@ export const Timetable: React.FC<TimetableProps> = ({ user }) => {
                          Timetable - {selectedSection}
                      </h1>
                  </div>
-                 <h1 className="text-4xl font-bold underline decoration-4 decoration-black underline-offset-8">SOCIE</h1>
                  <div className="text-right">
                     <div className="text-3xl font-bold text-gray-800">Inha University in Tashkent</div>
                  </div>

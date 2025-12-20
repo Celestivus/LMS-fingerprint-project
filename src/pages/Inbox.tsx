@@ -7,14 +7,12 @@ const MOCK_EMAILS: Email[] = [
   { id: '1', sender: 'Medical certification', subject: 'Day before', preview: 'Let down and hanging around crushed like a bug in the ground', content: 'See attached.', date: 'Mon', time: '8:40', isRead: false, folder: 'inbox' },
   { id: '2', sender: 'SALIH ABDULLOYEV', subject: 'The previous week', preview: 'Let down and hanging around crushed like a bug in the ground', content: 'Hello,\n\nI noticed you missed the lab last week. Please ensure you submit the makeup assignment by Tuesday.\n\nBest,\nProf. Salih', date: 'Mon', time: '8:40', isRead: true, folder: 'inbox' },
   { id: '3', sender: 'Student Affairs', subject: 'Scholarship Update', preview: 'Regarding your application for the Fall semester...', content: 'We are pleased to inform you that your scholarship application has been reviewed.', date: 'Mon', time: '8:40', isRead: true, folder: 'inbox' },
-  { id: '4', sender: 'Library', subject: 'Overdue Book', preview: 'Introduction to Algorithms is overdue by 3 days.', content: 'Please return the book immediately to avoid fines.', date: 'Sun', time: '14:20', isRead: true, folder: 'inbox' },
-  { id: '5', sender: 'Draft 1', subject: '(No Subject)', preview: 'To whomever it may concern...', content: '', date: 'Sat', time: '10:00', isRead: true, folder: 'drafts' },
-];
+  ];
 
 export const Inbox: React.FC = () => {
   const ws = getWS();
 
-  const [selectedFolder, setSelectedFolder] = useState<'inbox' | 'drafts' | 'sent' | 'spam'>('inbox');
+  const [selectedFolder, setSelectedFolder] = useState<'inbox'>('inbox');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
   const filteredEmails = MOCK_EMAILS.filter(e => e.folder === selectedFolder);
@@ -36,7 +34,6 @@ export const Inbox: React.FC = () => {
         return () => ws.close();
     }, [ws]);
 
-  // Render logic for the specific "Medical Certification" email type
   const renderEmailContent = (email: Email) => {
     if (email.sender === 'Medical certification') {
         return (
@@ -54,39 +51,14 @@ export const Inbox: React.FC = () => {
                     {/* Mock Certificate Image */}
                     <div className="w-full max-w-2xl bg-white shadow-lg border border-gray-300 p-8 mb-8 relative">
                         <div className="absolute top-4 left-4 w-16 h-16 rounded-full border-4 border-blue-200 flex items-center justify-center">
-                            <div className="text-blue-500 font-bold text-2xl">+</div>
                         </div>
                         <h1 className="text-center font-serif text-3xl mb-8 tracking-widest text-gray-700">MEDICAL CERTIFICATE</h1>
-                        
-                        <div className="font-serif space-y-6 text-lg text-gray-600">
-                            <div className="flex justify-end mb-8">
-                                <span>Date: <span className="underline decoration-dotted text-black">12/03/2024</span></span>
-                            </div>
-                            
-                            <h2 className="font-bold text-black uppercase">To Whomsoever It May Concern</h2>
-                            
-                            <p>
-                                This is to certify that Mr./Mrs. <span className="underline decoration-dotted text-black font-bold">Magomed Mama</span>, 
-                                Age <span className="underline decoration-dotted text-black">20</span> years, residing at <span className="underline decoration-dotted text-black">Tashkent</span>
-                                was under my treatment since <span className="underline decoration-dotted text-black">10/03/2024</span>.
-                            </p>
-                            
-                            <p>
-                                Suffering from <span className="underline decoration-dotted text-black font-bold">Viral Fever</span>. 
-                                He/She is/was adviced treatment or rest for this period.
-                            </p>
-                        </div>
-                        
                         <div className="mt-16 flex justify-end">
                             <div className="text-center">
-                                <div className="h-10"></div>
-                                <div className="border-t border-black w-48"></div>
-                                <div className="font-bold text-gray-800 mt-1">MEDICAL OFFICER</div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex gap-8 w-full max-w-xl">
                         <button className="flex-1 bg-[#10b981] hover:bg-[#059669] text-white py-3 rounded font-bold shadow-md active:translate-y-1 transition-all flex items-center justify-center gap-2">
                             <Check size={20} /> Approve
@@ -127,10 +99,8 @@ export const Inbox: React.FC = () => {
       <div className="w-64 border-r-2 border-black bg-white flex flex-col">
         <div className="flex-1 overflow-y-auto">
             <div className="mt-4">
-                <div 
-                    onClick={() => setSelectedFolder('inbox')}
-                    className={`px-4 py-2 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-100 ${selectedFolder === 'inbox' ? 'bg-slate-200' : ''}`}
-                >
+                <div onClick={() => setSelectedFolder('inbox')}
+                    className={`px-4 py-2 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-100 ${selectedFolder === 'inbox' ? 'bg-slate-200' : ''}`}>
                     <span className="flex-1">Incoming</span>
                     {MOCK_EMAILS.filter(e => e.folder === 'inbox' && !e.isRead).length > 0 && (
                         <span className="bg-black text-white text-xs px-2 py-0.5 rounded-full">
@@ -140,20 +110,6 @@ export const Inbox: React.FC = () => {
                 </div>
                 <div onClick={() => setSelectedFolder('drafts')} className={`px-4 py-2 cursor-pointer font-medium flex items-center gap-2 hover:bg-slate-100 ${selectedFolder === 'drafts' ? 'bg-slate-200' : ''}`}>Drafts</div>
                 <div onClick={() => setSelectedFolder('sent')} className={`px-4 py-2 cursor-pointer font-medium flex items-center gap-2 hover:bg-slate-100 ${selectedFolder === 'sent' ? 'bg-slate-200' : ''}`}>Sent</div>
-            </div>
-
-            <div className="mt-6 px-4">
-                <h3 className="font-bold border-b-2 border-black mb-2 flex justify-between items-center cursor-pointer">
-                    SALIH ABDULLOYEV <ChevronDown size={16}/>
-                </h3>
-                <div className="pl-2 space-y-1">
-                     <div className="text-sm cursor-pointer hover:underline">Incoming</div>
-                     <div className="text-sm cursor-pointer hover:underline">Drafts</div>
-                     <div className="text-sm cursor-pointer hover:underline">Sent</div>
-                     <div className="text-sm cursor-pointer hover:underline">Deleted</div>
-                     <div className="text-sm cursor-pointer hover:underline">Notes</div>
-                     <div className="text-sm cursor-pointer hover:underline">Spam</div>
-                </div>
             </div>
         </div>
       </div>
@@ -168,8 +124,7 @@ export const Inbox: React.FC = () => {
             <div 
                 key={email.id}
                 onClick={() => { setSelectedEmail(email); }}
-                className={`p-4 border-b border-gray-300 cursor-pointer hover:bg-blue-50 transition-colors ${selectedEmail?.id === email.id ? 'bg-blue-100' : ''}`}
-            >
+                className={`p-4 border-b border-gray-300 cursor-pointer hover:bg-blue-50 transition-colors ${selectedEmail?.id === email.id ? 'bg-blue-100' : ''}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className={`font-bold text-sm ${!email.isRead ? 'text-black' : 'text-gray-700'}`}>{email.sender}</span>
                     <div className="text-xs text-right leading-tight">
@@ -190,8 +145,7 @@ export const Inbox: React.FC = () => {
                 <Mail size={80} className="mx-auto mb-4 stroke-1"/>
                 <h1 className="text-3xl font-bold text-black mb-2">Click on the</h1>
                 <h1 className="text-3xl font-bold text-black">message to read it.</h1>
-            </div>
-        )}
+            </div>)}
       </div>
     </div>
   );
