@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, UserRole } from '../types';
 import { Lock, User as UserIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { connectWS, getWS, addMessageListener, removeMessageListener } from '../ws';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -16,48 +17,67 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     e.preventDefault();
 
     let user: User;
-    
-    if (id.startsWith('U')) {
-        // Student pattern
-        user = {
-            id: id,
-            name: 'Dubayskiy Indus',
-            role: UserRole.STUDENT,
-            group: 'CSE 23-01',
-            avatarUrl: 'https://picsum.photos/id/64/200/200'
-        };
-    } else if (id.startsWith('P')) {
-        // Professor pattern
-        user = {
-            id: id,
-            name: 'Salih Abdulloyev',
-            role: UserRole.PROFESSOR,
-            avatarUrl: 'https://picsum.photos/id/65/200/200'
-        };
-    } else if (id.startsWith('S')) {
-        // Staff pattern
-        user = {
-            id: id,
-            name: 'Staff Member',
-            role: UserRole.ACADEMIC_AFFAIRS,
-        };
-    } else if (id === 'admin') {
-        user = {
-            id: 'ROOT',
-            name: 'System Administrator',
-            role: UserRole.SYS_ADMIN,
-        };
-    } else {
-        // default user
-        user = {
-            id: id || 'U2310008',
-            name: 'Demo User',
-            role: UserRole.STUDENT,
-            group: 'CSE 23-01'
-        };
-    }
+    const ws = getWS();
 
-    onLogin(user);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const payload = {
+          type: "login",
+          user:UserRole,
+          id: id,
+          password: password
+        };
+
+        ws.send(JSON.stringify(payload));
+    } else {
+        console.error("WebSocket not connected.");
+    }
+    // wait for server response
+    if (ws) {
+      const listener = (ev: MessageEvent) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg && msg.type === 'login_response') {
+            removeMessageListener(listener);
+            if (msg.success && msg.user) {
+              const u = msg.user;
+              let mapped: User;
+              if (u.role === 'student') {
+                mapped = {
+                  id: u.id,
+                  name: u.name,
+                  role: UserRole.STUDENT,
+                  group: u.section || undefined
+                };
+              } else if (u.role === 'professor') {
+                mapped = {
+                  id: u.id,
+                  name: u.name,
+                  role: UserRole.PROFESSOR
+                };
+              } else {
+                mapped = {
+                  id: u.id,
+                  name: u.name,
+                  role: UserRole.STUDENT
+                };
+              }
+
+              onLogin(mapped);
+            } else {
+              // show error
+              alert(msg.error || 'Login failed');
+            }
+          }
+        } catch (err) {
+          console.error('Invalid message', err);
+        }
+      };
+
+      addMessageListener(listener);
+
+      // safety timeout: remove listener after 6s
+      setTimeout(() => removeMessageListener(listener), 6000);
+    }
   };
 
   return (
