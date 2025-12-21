@@ -480,21 +480,31 @@ async def handler(ws):
                         )
                         cur = conn.cursor()
 
-                        cur.execute(
-                            """
-                            SELECT student_id, session_label, course_name, attendance 
-                            FROM Attendance 
-                            WHERE section_number = %s AND course_name = %s AND session_label = %s
-                            ORDER BY student_id
-                            """,
-                            (section, course, week),
-                        )
+                        # If week is 'ALL', fetch all weeks for the course/section
+                        if week == "ALL":
+                            cur.execute(
+                                """
+                                SELECT student_id, session_label, course_name, attendance 
+                                FROM Attendance 
+                                WHERE section_number = %s AND course_name = %s
+                                ORDER BY student_id, session_label
+                                """,
+                                (section, course),
+                            )
+                        else:
+                            cur.execute(
+                                """
+                                SELECT student_id, session_label, course_name, attendance 
+                                FROM Attendance 
+                                WHERE section_number = %s AND course_name = %s AND session_label = %s
+                                ORDER BY student_id
+                                """,
+                                (section, course, week),
+                            )
+
                         rows = cur.fetchall()
                         print(
                             f"  >> Query executed. Found {len(rows)} attendance records"
-                        )
-                        print(
-                            f"  >> Query params: section_number='{section}', course_name='{course}', session_label='{week}'"
                         )
 
                         attendance_list = []
@@ -506,9 +516,6 @@ async def handler(ws):
                                     "course_name": r[2],
                                     "attendance": r[3],
                                 }
-                            )
-                            print(
-                                f"  >> Record: student_id={r[0]}, session_label={r[1]}, course_name={r[2]}, attendance={r[3]}"
                             )
 
                         return {"success": True, "attendance": attendance_list}
@@ -729,8 +736,321 @@ async def handler(ws):
                 await ws.send(json.dumps(resp))
                 continue
 
-    except Exception as e:
-        print("Error:", e)
+            # Handle medical certification upload from student
+            if (
+                isinstance(data, dict)
+                and data.get("type") == "upload_medical_certification"
+            ):
+                student_id = data.get("student_id")
+                course_name = data.get("course_name")
+                session_label = data.get("session_label")
+                file_name = data.get("file_name")
+                file_base64 = data.get("file_data")
+
+                print(
+                    f">>> Medical certification upload: student={student_id}, course={course_name}, week={session_label}, file={file_name}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def save_medical_certification(
+                    student_id, course_name, session_label, file_name, file_base64
+                ):
+                    try:
+                        # Decode file
+                        match = re.match(r"data:.+;base64,(.*)", file_base64)
+                        if match:
+                            file_bytes = base64.b64decode(match.group(1))
+                        else:
+                            file_bytes = base64.b64decode(file_base64)
+
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        cur.execute(
+                            """
+                            INSERT INTO MedicalCertifications 
+                            (student_id, course_name, session_label, certification_file, file_name, status)
+                            VALUES (%s, %s, %s, %s, %s, 'pending')
+                            ON CONFLICT (student_id, course_name, session_label)
+                            DO UPDATE SET certification_file = EXCLUDED.certification_file, 
+                                          file_name = EXCLUDED.file_name,
+                                          uploaded_at = CURRENT_TIMESTAMP,
+                                          status = 'pending'
+                            """,
+                            (
+                                student_id,
+                                course_name,
+                                session_label,
+                                psycopg2.Binary(file_bytes),
+                                file_name,
+                            ),
+                        )
+                        conn.commit()
+                        print(f"  >> Medical certification saved for {student_id}")
+                        return {
+                            "success": True,
+                            "message": "Certification uploaded successfully",
+                        }
+                    except Exception as e:
+                        print(f"  >> Error saving medical certification: {e}")
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(
+                    None,
+                    save_medical_certification,
+                    student_id,
+                    course_name,
+                    session_label,
+                    file_name,
+                    file_base64,
+                )
+                resp = {
+                    "type": "medical_certification_response",
+                    "success": result.get("success"),
+                    "message": result.get("message") or result.get("error"),
+                }
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle professor viewing pending certifications
+            if (
+                isinstance(data, dict)
+                and data.get("type") == "get_pending_certifications"
+            ):
+                print(">>> Get pending medical certifications request")
+
+                loop = asyncio.get_running_loop()
+
+                def fetch_pending_certifications():
+                    try:
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        cur.execute(
+                            """
+                            SELECT id, student_id, course_name, session_label, file_name, uploaded_at, status
+                            FROM MedicalCertifications
+                            WHERE status = 'pending'
+                            ORDER BY uploaded_at DESC
+                            """
+                        )
+                        rows = cur.fetchall()
+                        print(f"  >> Found {len(rows)} pending certifications")
+
+                        certifications = []
+                        for r in rows:
+                            certifications.append(
+                                {
+                                    "id": r[0],
+                                    "student_id": r[1],
+                                    "course_name": r[2],
+                                    "session_label": r[3],
+                                    "file_name": r[4],
+                                    "uploaded_at": r[5].isoformat() if r[5] else None,
+                                    "status": r[6],
+                                }
+                            )
+
+                        return {"success": True, "certifications": certifications}
+                    except Exception as e:
+                        print(f"  >> DB error fetching certifications: {e}")
+                        return {"success": False, "error": str(e), "certifications": []}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(None, fetch_pending_certifications)
+                resp = {
+                    "type": "pending_certifications_list",
+                    "certifications": result.get("certifications", []),
+                }
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle professor approving medical certification
+            if isinstance(data, dict) and data.get("type") == "approve_certification":
+                certification_id = data.get("certification_id")
+                professor_id = data.get("professor_id")
+                notes = data.get("notes", "")
+
+                print(
+                    f">>> Approve certification: id={certification_id}, professor={professor_id}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def approve_certification(certification_id, professor_id, notes):
+                    try:
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        # Get certification details
+                        cur.execute(
+                            "SELECT student_id, course_name, session_label FROM MedicalCertifications WHERE id = %s",
+                            (certification_id,),
+                        )
+                        cert_row = cur.fetchone()
+                        if not cert_row:
+                            return {
+                                "success": False,
+                                "error": "Certification not found",
+                            }
+
+                        student_id, course_name, session_label = cert_row
+
+                        # Update certification status
+                        cur.execute(
+                            """
+                            UPDATE MedicalCertifications
+                            SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = %s, professor_notes = %s
+                            WHERE id = %s
+                            """,
+                            (professor_id, notes, certification_id),
+                        )
+
+                        # Update attendance to 1 (present) for that week
+                        cur.execute(
+                            """
+                            SELECT section_number FROM Students WHERE student_id = %s
+                            """,
+                            (student_id,),
+                        )
+                        section_row = cur.fetchone()
+                        if section_row:
+                            section_number = section_row[0]
+                            cur.execute(
+                                """
+                                UPDATE Attendance
+                                SET attendance = 1
+                                WHERE student_id = %s AND course_name = %s AND session_label = %s
+                                """,
+                                (student_id, course_name, session_label),
+                            )
+                            print(
+                                f"  >> Attendance updated to 1 for {student_id} {course_name} {session_label}"
+                            )
+
+                        conn.commit()
+                        print(f"  >> Certification {certification_id} approved")
+                        return {
+                            "success": True,
+                            "message": "Certification approved and attendance updated",
+                        }
+                    except Exception as e:
+                        print(f"  >> Error approving certification: {e}")
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(
+                    None, approve_certification, certification_id, professor_id, notes
+                )
+                resp = {
+                    "type": "certification_approval_response",
+                    "success": result.get("success"),
+                    "message": result.get("message") or result.get("error"),
+                }
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle professor rejecting medical certification
+            if isinstance(data, dict) and data.get("type") == "reject_certification":
+                certification_id = data.get("certification_id")
+                professor_id = data.get("professor_id")
+                notes = data.get("notes", "")
+
+                print(
+                    f">>> Reject certification: id={certification_id}, professor={professor_id}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def reject_certification(certification_id, professor_id, notes):
+                    try:
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        cur.execute(
+                            """
+                            UPDATE MedicalCertifications
+                            SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = %s, professor_notes = %s
+                            WHERE id = %s
+                            """,
+                            (professor_id, notes, certification_id),
+                        )
+                        conn.commit()
+                        print(f"  >> Certification {certification_id} rejected")
+                        return {"success": True, "message": "Certification rejected"}
+                    except Exception as e:
+                        print(f"  >> Error rejecting certification: {e}")
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(
+                    None, reject_certification, certification_id, professor_id, notes
+                )
+                resp = {
+                    "type": "certification_rejection_response",
+                    "success": result.get("success"),
+                    "message": result.get("message") or result.get("error"),
+                }
+                await ws.send(json.dumps(resp))
+                continue
 
     finally:
         connected.remove(ws)

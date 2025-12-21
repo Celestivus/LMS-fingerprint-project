@@ -57,7 +57,7 @@ const AppContent: React.FC = () => {
                         user.role === UserRole.SYS_ADMIN ? <Navigate to="/sysadmin" /> :
                         <Dashboard />
                     } />
-                    <Route path="/inbox" element={<Inbox />} />
+                    <Route path="/inbox" element={<Inbox user={user} />} />
                     <Route path="/timetable" element={<Timetable user={user} />} />
                     <Route path="/attendance" element={<Attendance user={user} />} />
                     <Route path="/professor-list" element={<ProfessorList />} />

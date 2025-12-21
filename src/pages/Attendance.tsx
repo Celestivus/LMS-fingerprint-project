@@ -3,6 +3,7 @@ import { User, UserRole, SECTIONS } from '../types';
 import { Upload, ChevronDown } from 'lucide-react';
 import { studentsData } from '../students';
 import { FingerprintUploadModal } from '../components/FingerprintUploadModal';
+import { MedicalCertificationModal } from '../components/MedicalCertificationModal';
 import { connectWS, getWS, addMessageListener, removeMessageListener } from '../ws';
 
 interface AttendanceProps {
@@ -29,11 +30,8 @@ const SESSIONS = WEEKS.flatMap(week => [
 const ProfessorAttendanceView: React.FC = () => {
     const [markingMode, setMarkingMode] = useState(false);
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
-    // Load attendance data from localStorage on mount (but can be cleared)
-    const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>(() => {
-        const saved = localStorage.getItem('professorAttendanceData');
-        return saved ? JSON.parse(saved) : {};
-    });
+    // Don't load from localStorage on mount - always fetch fresh from DB based on current course/section
+    const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>({});
     const [showScanner, setShowScanner] = useState(false);
     const [showFingerprintUpload, setShowFingerprintUpload] = useState(false);
 
@@ -44,13 +42,6 @@ const ProfessorAttendanceView: React.FC = () => {
     const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
 
     const [profViewStudents, setProfViewStudents] = React.useState<Array<{id:string;name:string;absences:number;email?:string}>>([]);
-
-    // Clear old localStorage cache on first mount
-    React.useEffect(() => {
-        console.log('Professor view mounted - clearing old localStorage cache');
-        localStorage.removeItem('professorAttendanceData');
-        setAttendanceData({});
-    }, []);
 
     // Request students list from server when section changes
     React.useEffect(() => {
@@ -114,53 +105,107 @@ const ProfessorAttendanceView: React.FC = () => {
         };
     }, [currentSection]);
 
-    // Load attendance from localStorage on mount (instant display, no server wait)
+    // Add listener for cert approval/rejection to refresh attendance for all weeks
     React.useEffect(() => {
-        const saved = localStorage.getItem('professorAttendanceData');
-        if (saved) {
-            try {
-                setAttendanceData(JSON.parse(saved));
-                console.log('Loaded attendance from localStorage on mount');
-            } catch (e) {
-                console.error('Failed to parse localStorage attendance data', e);
-            }
-        }
-    }, []);
+        connectWS('127.0.0.1');
 
-    // Fetch attendance for currently selected week/course ONLY (on-demand, not all weeks)
+        const certListener = (ev: MessageEvent) => {
+            try {
+                const msg = JSON.parse(ev.data) as any;
+                if (msg && (msg.type === 'certification_approval_response' || msg.type === 'certification_rejection_response')) {
+                    console.log('Cert approval/rejection detected - refreshing attendance');
+                    
+                    // Clear all attendance cache for current course
+                    setAttendanceData(prev => {
+                        const newData = { ...prev };
+                        Object.keys(newData).forEach(key => {
+                            if (key.endsWith(`-${currentCourse}`)) {
+                                delete newData[key];
+                            }
+                        });
+                        localStorage.setItem('professorAttendanceData', JSON.stringify(newData));
+                        return newData;
+                    });
+                    
+                    // Re-fetch all attendance data
+                    setTimeout(() => {
+                        const payload = {
+                            type: 'get_attendance_data',
+                            section: currentSection,
+                            course: currentCourse,
+                            week: 'ALL'
+                        };
+                        
+                        const ws = getWS();
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify(payload));
+                            console.log('Sent refresh request for all weeks');
+                        }
+                    }, 100);
+                }
+            } catch (e) {
+                console.error('Error processing cert approval message', e);
+            }
+        };
+
+        addMessageListener(certListener);
+        return () => removeMessageListener(certListener);
+    }, [currentCourse, currentSection]);
+
+    // Note: Removed localStorage loading on mount for professors
+    // This ensures professors always see fresh data from the database
+    // Medical cert changes won't be visible in attendance until explicitly approved by the professor
+
+    // Automatically fetch attendance for ALL weeks/students at once when course/section changes
     React.useEffect(() => {
-        console.log('Fetching attendance for current week:', currentCourse, currentSection, selectedSession);
+        console.log('Fetching all attendance data for:', currentCourse, currentSection);
         
-        if (!selectedSession) return; // Don't fetch if no session selected
+        // FIRST: Clear old data that doesn't match current course
+        setAttendanceData(prev => {
+            const newData: Record<string, boolean> = {};
+            Object.keys(prev).forEach(key => {
+                // Only keep data that matches current course
+                if (key.endsWith(`-${currentCourse}`)) {
+                    newData[key] = prev[key];
+                }
+            });
+            // If no matching data, start fresh
+            if (Object.keys(newData).length === 0) {
+                console.log('No existing data for current course, starting fresh');
+                return {};
+            }
+            return newData;
+        });
         
         connectWS('127.0.0.1');
 
-        const requestId = `${Date.now()}-${Math.floor(Math.random()*10000)}`;
-        let listener: ((ev: MessageEvent) => void) | null = null;
-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-        listener = (ev: MessageEvent) => {
+        const listener = (ev: MessageEvent) => {
             try {
                 const msg = JSON.parse(ev.data) as any;
                 if (msg && msg.type === 'attendance_data') {
-                    console.log('Attendance data received for week:', selectedSession, msg);
+                    console.log('All attendance data received:', msg.attendance?.length || 0, 'records');
                     
                     if (msg.attendance && Array.isArray(msg.attendance)) {
                         setAttendanceData(prev => {
                             const newData = { ...prev };
+                            
+                            // First, clear all old data for this course
+                            Object.keys(newData).forEach(key => {
+                                if (key.endsWith(`-${currentCourse}`)) {
+                                    delete newData[key];
+                                }
+                            });
+                            
+                            // Update with fresh records
                             msg.attendance.forEach((record: any) => {
                                 const key = `${record.student_id}-${record.session_label}-${record.course_name || currentCourse}`;
                                 newData[key] = record.attendance === 0;
-                                console.log(`Updated: ${key} = ${record.attendance === 0}`);
                             });
+                            
                             localStorage.setItem('professorAttendanceData', JSON.stringify(newData));
                             return newData;
                         });
-                    }
-                    
-                    if (listener && timeoutId) {
                         removeMessageListener(listener);
-                        clearTimeout(timeoutId);
                     }
                 }
             } catch (e) {
@@ -170,16 +215,12 @@ const ProfessorAttendanceView: React.FC = () => {
 
         addMessageListener(listener);
 
-        // Get the session label for the selected session ID
-        const sessionLabel = SESSIONS.find(s => s.id === selectedSession)?.label;
-        if (!sessionLabel) return;
-
+        // Fetch all attendance for this course/section at once
         const payload = {
             type: 'get_attendance_data',
             section: currentSection,
             course: currentCourse,
-            week: sessionLabel,
-            request_id: requestId
+            week: 'ALL' // Request all weeks at once
         };
 
         let attempts = 0;
@@ -187,7 +228,7 @@ const ProfessorAttendanceView: React.FC = () => {
             const ws = getWS();
             if (ws && ws.readyState === WebSocket.OPEN) {
                 try {
-                    console.log('Fetching attendance for selected week:', sessionLabel);
+                    console.log('Fetching attendance for all weeks');
                     ws.send(JSON.stringify(payload));
                     clearInterval(interval);
                 } catch (e) {
@@ -203,17 +244,17 @@ const ProfessorAttendanceView: React.FC = () => {
             }
         }, 100);
 
-        timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             console.warn('Attendance fetch timeout');
-            if (listener) removeMessageListener(listener);
-        }, 10000);
+            removeMessageListener(listener);
+        }, 5000);
 
         return () => {
-            if (listener) removeMessageListener(listener);
-            if (timeoutId) clearTimeout(timeoutId);
+            removeMessageListener(listener);
             clearInterval(interval);
+            clearTimeout(timeoutId);
         };
-    }, [currentCourse, currentSection, selectedSession]);
+    }, [currentCourse, currentSection]);
 
     const allowedSections = ['CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
 
@@ -223,13 +264,13 @@ const ProfessorAttendanceView: React.FC = () => {
     };
 
     const handleSessionClick = (sessionId: string) => {
+        // Week selection is now automatic - no manual clicking needed
+        // This function is kept for marking mode only
         if (markingMode) {
             if (confirm("Stop marking current session and switch?")) {
                 setMarkingMode(false);
                 setSelectedSession(sessionId);
             }
-        } else {
-            setSelectedSession(sessionId);
         }
     };
 
@@ -455,15 +496,11 @@ const ProfessorAttendanceView: React.FC = () => {
                             {SESSIONS.map(session => (
                                 <div
                                     key={session.id}
-                                    onClick={() => handleSessionClick(session.id)}
-                                    className={`w-[50px] shrink-0 border-r border-black flex items-center justify-center text-sm font-bold cursor-pointer transition-all relative group h-full
+                                    className={`w-[50px] shrink-0 border-r border-black flex items-center justify-center text-sm font-bold relative group h-full
                                         ${selectedSession === session.id 
                                             ? 'bg-[#2a4580] text-white' 
-                                            : 'hover:bg-gray-200 bg-white'}`} >
+                                            : 'bg-white'}`} >
                                     {session.label}
-                                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                                        Select
-                                    </span>
                                 </div>))}
                         </div>
 
@@ -520,6 +557,9 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
     const [studentAttendance, setStudentAttendance] = useState<Record<string, number>>({});
     const [studentCourses, setStudentCourses] = useState<Array<{course: string, absences: number}>>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showMedicalCertModal, setShowMedicalCertModal] = useState(false);
+    const [selectedCertCourse, setSelectedCertCourse] = useState<string>('');
+    const [selectedCertWeek, setSelectedCertWeek] = useState<string>('');
 
     // Fetch student's attendance data on mount and when explicitly refreshed
     React.useEffect(() => {
@@ -628,6 +668,18 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
 
     return (
         <div className="flex flex-col h-full bg-white relative">
+            {showMedicalCertModal && (
+                <MedicalCertificationModal
+                    studentId={user.id}
+                    courseName={selectedCertCourse}
+                    sessionLabel={selectedCertWeek}
+                    onClose={() => setShowMedicalCertModal(false)}
+                    onSuccess={() => {
+                        // Re-fetch attendance data after successful upload
+                        setIsLoading(true);
+                    }}
+                />
+            )}
             <div className="flex border-b-4 border-black bg-white shrink-0">
                 <div className="w-96 flex-shrink-0 p-4 border-r-4 border-black flex items-center justify-center">
                     <div className="text-center">
@@ -678,17 +730,26 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                                             const key = `${courseData.course}-${session.label}`;
                                             const attendance = studentAttendance[key];
                                             const hasData = key in studentAttendance;
+                                            const isAbsent = hasData && attendance === 0;
                                             
                                             return (
-                                                <div
+                                                <button
                                                     key={session.id}
-                                                    className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center h-full text-sm font-bold transition-colors
-                                                        ${hasData && attendance === 1 ? 'bg-green-200 text-green-700 border-green-400' : ''}
-                                                        ${hasData && attendance === 0 ? 'bg-red-300 text-red-700 border-red-400' : ''}
-                                                        ${!hasData ? 'bg-gray-100' : ''}`}
-                                                    title={hasData ? (attendance === 1 ? 'Present' : 'Absent') : 'No data'}>
+                                                    onClick={() => {
+                                                        if (isAbsent) {
+                                                            setSelectedCertCourse(courseData.course);
+                                                            setSelectedCertWeek(session.label);
+                                                            setShowMedicalCertModal(true);
+                                                        }
+                                                    }}
+                                                    className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center h-full text-sm font-bold transition-colors cursor-pointer relative
+                                                        ${hasData && attendance === 1 ? 'bg-green-200 text-green-700 border-green-400 hover:bg-green-300' : ''}
+                                                        ${isAbsent ? 'bg-red-300 text-red-700 border-red-400 hover:bg-red-400 hover:scale-110' : ''}
+                                                        ${!hasData ? 'bg-gray-100 hover:bg-gray-200' : ''}`}
+                                                    title={isAbsent ? 'Click to upload medical certificate' : (hasData ? (attendance === 1 ? 'Present' : 'Absent') : 'No data')}>
                                                     {hasData ? (attendance === 1 ? <span>✓</span> : <span>✕</span>) : <span className="text-gray-400">—</span>}
-                                                </div>
+                                                    {isAbsent && <span className="absolute top-0 right-0 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>}
+                                                </button>
                                             );
                                         })}
                                     </div>
