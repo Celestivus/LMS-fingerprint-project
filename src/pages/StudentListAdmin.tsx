@@ -1,20 +1,52 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole, SECTIONS } from '../types';
-import { studentsData } from '../students';
+import { getWS, addMessageListener, removeMessageListener } from '../ws';
 import { ChevronDown } from 'lucide-react';
-
-const MOCK_STUDENTS_FULL: User[] = studentsData.map(s => ({
-    id: s.id,
-    name: s.name,
-    role: UserRole.STUDENT,
-    group: s.group,
-    email: s.email
-}));
 
 export const StudentListAdmin: React.FC = () => {
   const [currentSection, setCurrentSection] = useState('CSE-23-01');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [students, setStudents] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch students when section changes
+  useEffect(() => {
+    setLoading(true);
+    const handleStudentsList = (ev: MessageEvent) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'students_list' && data.section === currentSection) {
+          const studentUsers = (data.students || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            role: UserRole.STUDENT,
+            group: s.section,
+            email: s.email
+          }));
+          setStudents(studentUsers);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('Error parsing students list:', e);
+      }
+    };
+
+    const ws = getWS();
+    if (ws) {
+      addMessageListener(handleStudentsList);
+      ws.send(
+        JSON.stringify({
+          type: 'get_students_by_section',
+          section: currentSection
+        })
+      );
+
+      return () => {
+        removeMessageListener(handleStudentsList);
+      };
+    }
+  }, [currentSection]);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -62,14 +94,20 @@ export const StudentListAdmin: React.FC = () => {
                  </div>
 
                  <div className="p-8 space-y-4 overflow-y-auto flex-1">
-                     {MOCK_STUDENTS_FULL.map((student, idx) => (
+                     {loading ? (
+                       <div className="text-center text-gray-500 py-8">Loading students...</div>
+                     ) : students.length === 0 ? (
+                       <div className="text-center text-gray-500 py-8">No students found in this section</div>
+                     ) : (
+                       students.map((student, idx) => (
                          <div key={idx} className="flex text-lg font-bold border-b border-gray-100 pb-2 hover:bg-slate-50 transition-colors cursor-pointer group">
                              <div className="w-1/3 pl-4 group-hover:translate-x-1 transition-transform">{student.name}</div>
                              <div className="w-1/4 text-center">{student.id}</div>
                              <div className="w-1/6 text-center text-gray-400 group-hover:text-black transition-colors">{student.group}</div>
                              <div className="w-1/4 text-center underline text-blue-800 text-sm italic">{student.email}</div>
                          </div>
-                     ))}
+                       ))
+                     )}
                  </div>
              </div>
          </div>

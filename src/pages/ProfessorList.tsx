@@ -1,19 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
+import { getWS, addMessageListener, removeMessageListener } from '../ws';
 
 const DEPARTMENTS = ['LOG', 'SOCIE', 'BUS'];
 
-const MOCK_PROFESSORS: User[] = [
-    { id: 'U140001', name: 'Angelina Saydasheva', role: UserRole.PROFESSOR, email: 'a.saydasheva@student.inha.uz', department: 'SOCIE' },
-    { id: 'U2310777', name: 'Gandon Ebanniy', role: UserRole.PROFESSOR, email: 's.shluxi@student.inha.uz', department: 'SOCIE' },
-    { id: 'U2310090', name: 'Pizda Niso', role: UserRole.PROFESSOR, email: 's.shluxi@student.inha.uz', department: 'SOCIE' },
-    { id: 'U2310008', name: 'Chlen Solekha', role: UserRole.PROFESSOR, email: 's.shluxi@student.inha.uz', department: 'SOCIE' },
-    { id: 'U2310792', name: 'Pizda Sevinch', role: UserRole.PROFESSOR, email: 's.shluxi@student.inha.uz', department: 'BM' },
-    { id: 'U2310777', name: 'Gandon Ebanniy', role: UserRole.PROFESSOR, email: 's.shluxi@student.inha.uz', department: 'IT' },
-];
-
 export const ProfessorList: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [professors, setProfessors] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch professors when department is selected
+  useEffect(() => {
+    if (!selectedDept) return;
+
+    setLoading(true);
+    const handleProfessorsList = (ev: MessageEvent) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'professors_list' && data.department === selectedDept) {
+          const professorUsers = (data.professors || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            role: UserRole.PROFESSOR,
+            email: p.email,
+            department: p.department
+          }));
+          setProfessors(professorUsers);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('Error parsing professors list:', e);
+      }
+    };
+
+    const ws = getWS();
+    if (ws) {
+      addMessageListener(handleProfessorsList);
+      ws.send(
+        JSON.stringify({
+          type: 'get_professors_by_department',
+          department: selectedDept
+        })
+      );
+
+      return () => {
+        removeMessageListener(handleProfessorsList);
+      };
+    }
+  }, [selectedDept]);
 
   if (!selectedDept) {
       return (
@@ -33,8 +67,6 @@ export const ProfessorList: React.FC = () => {
           </div>
       );
   }
-
-  const filteredProfs = MOCK_PROFESSORS.filter(p => p.department === selectedDept || !p.department);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -62,13 +94,17 @@ export const ProfessorList: React.FC = () => {
 
                  {/* List */}
                  <div className="p-8 space-y-8">
-                     {filteredProfs.length > 0 ? filteredProfs.map((prof, idx) => (
+                     {loading ? (
+                       <div className="text-center text-gray-500 py-8">Loading professors...</div>
+                     ) : professors.length > 0 ? (
+                       professors.map((prof, idx) => (
                          <div key={idx} className="flex text-xl font-bold">
                              <div className="w-1/3 text-center">{prof.name}</div>
                              <div className="w-1/3 text-center">{prof.id}</div>
                              <div className="w-1/3 text-center underline">{prof.email}</div>
                          </div>
-                     )) : (
+                       ))
+                     ) : (
                         <div className="text-center text-gray-400 text-2xl mt-20">No professors found in this department.</div>
                      )}
                  </div>

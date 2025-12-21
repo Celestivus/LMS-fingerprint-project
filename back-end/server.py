@@ -7,7 +7,8 @@ import psycopg2
 import io
 from PIL import Image
 import numpy as np
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 
 # DB config (matches usb scripts)
 DB_CONFIG = {
@@ -62,6 +63,19 @@ def compare_fingerprints(
     except Exception as e:
         print(f"  >> Error comparing fingerprints: {e}")
         return False
+
+
+def convert_decimal_to_float(obj):
+    """Recursively convert Decimal and date objects to JSON-serializable types"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {key: convert_decimal_to_float(val) for key, val in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_decimal_to_float(item) for item in obj]
+    return obj
 
 
 connected = set()
@@ -373,6 +387,84 @@ async def handler(ws):
                     }
                     print(
                         f"Error fetching students for {section}: {result.get('error')}"
+                    )
+
+                print("Response:", json.dumps(resp))
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle request for professors by department
+            if (
+                isinstance(data, dict)
+                and data.get("type") == "get_professors_by_department"
+            ):
+                department = data.get("department")
+                print(
+                    f">>> get_professors_by_department handler reached for department: {department}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def fetch_professors(department):
+                    try:
+                        print(f"  >> Connecting to DB for department {department}")
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+                        cur.execute(
+                            "SELECT professor_id, full_name, department, email FROM Professors WHERE department = %s ORDER BY full_name",
+                            (department,),
+                        )
+                        rows = cur.fetchall()
+                        print(f"  >> DB returned {len(rows)} rows")
+                        professors = []
+                        for r in rows:
+                            professors.append(
+                                {
+                                    "id": r[0],
+                                    "name": r[1],
+                                    "department": r[2],
+                                    "email": r[3],
+                                }
+                            )
+                        return {"success": True, "professors": professors}
+                    except Exception as e:
+                        print("  >> DB error fetching professors:", e)
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(None, fetch_professors, department)
+                if result.get("success"):
+                    resp = {
+                        "type": "professors_list",
+                        "department": department,
+                        "professors": result.get("professors"),
+                    }
+                    print(
+                        f"Sending {len(result.get('professors', []))} professors for department {department}"
+                    )
+                else:
+                    resp = {
+                        "type": "professors_list",
+                        "department": department,
+                        "professors": [],
+                        "error": result.get("error"),
+                    }
+                    print(
+                        f"Error fetching professors for {department}: {result.get('error')}"
                     )
 
                 print("Response:", json.dumps(resp))
@@ -1049,6 +1141,81 @@ async def handler(ws):
                     "success": result.get("success"),
                     "message": result.get("message") or result.get("error"),
                 }
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle get_database_tables (admin only)
+            if isinstance(data, dict) and data.get("type") == "get_database_tables":
+                print(">>> Fetching all database tables")
+                try:
+                    conn = psycopg2.connect(**DB_CONFIG)
+                    cur = conn.cursor()
+
+                    # Get all table names
+                    cur.execute(
+                        """
+                        SELECT table_name FROM information_schema.tables 
+                        WHERE table_schema='public' ORDER BY table_name
+                        """
+                    )
+                    tables = [row[0] for row in cur.fetchall()]
+                    print(f"  >> Found tables: {tables}")
+
+                    # Get data from each table
+                    all_tables = {}
+                    for table_name in tables:
+                        try:
+                            # Get column names
+                            cur.execute(
+                                f"""
+                                SELECT column_name FROM information_schema.columns 
+                                WHERE table_name = %s ORDER BY ordinal_position
+                                """,
+                                (table_name,)
+                            )
+                            columns = [row[0] for row in cur.fetchall()]
+
+                            # Get first 100 rows from table
+                            cur.execute(f"SELECT * FROM {table_name} LIMIT 100")
+                            rows = cur.fetchall()
+
+                            # Convert to list of dicts
+                            table_data = [
+                                dict(zip(columns, row))
+                                for row in rows
+                            ]
+
+                            # Convert Decimal and date values to JSON-serializable types
+                            table_data = convert_decimal_to_float(table_data)
+
+                            all_tables[table_name] = {
+                                "columns": columns,
+                                "rows": table_data,
+                                "row_count": len(table_data)
+                            }
+                            print(f"  >> Table {table_name}: {len(table_data)} rows (first 100)")
+
+                        except Exception as e:
+                            print(f"  >> Error reading table {table_name}: {e}")
+                            all_tables[table_name] = {"error": str(e), "columns": [], "rows": []}
+
+                    cur.close()
+                    conn.close()
+                    
+                    resp = {
+                        "type": "database_tables_response",
+                        "success": True,
+                        "data": all_tables
+                    }
+                except Exception as e:
+                    print(f"  >> Error getting database tables: {e}")
+                    resp = {
+                        "type": "database_tables_response",
+                        "success": False,
+                        "error": str(e)
+                    }
+                
+                resp = convert_decimal_to_float(resp)
                 await ws.send(json.dumps(resp))
                 continue
 

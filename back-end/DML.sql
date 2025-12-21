@@ -17,7 +17,7 @@ SELECT
   v.email,
   NULL AS telephone_number,
   NULL AS fingerprint,
-  v.student_iВ d AS password
+  v.student_id AS password
 FROM (VALUES
 ('U2310002','MUHAMMADYOSIN','ABBOSOV','CSE-23-01','m.abbosov@student.inha.uz'),
 ('U2310004','XASAN','ABDUKARIMOV','CSE-23-01','x.abdukarimov@student.inha.uz'),
