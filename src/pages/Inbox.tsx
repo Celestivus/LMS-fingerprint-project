@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Email, User } from '../types';
-import { Mail, Trash2, Star, ChevronDown, Check, X } from 'lucide-react';
+import { Mail, Trash2, Star, Check, X } from 'lucide-react';
 import { getWS, connectWS, addMessageListener, removeMessageListener } from '../ws';
 
 interface MedicalCertification {

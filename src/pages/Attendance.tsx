@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { User, UserRole, SECTIONS } from '../types';
+import { User, UserRole} from '../types';
 import { Upload, ChevronDown } from 'lucide-react';
-import { studentsData } from '../students';
 import { FingerprintUploadModal } from '../components/FingerprintUploadModal';
 import { MedicalCertificationModal } from '../components/MedicalCertificationModal';
 import { connectWS, getWS, addMessageListener, removeMessageListener } from '../ws';

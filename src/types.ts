@@ -11,8 +11,8 @@ export interface User {
   role: UserRole;
   group?: string;
   avatarUrl?: string;
-  email?: string; // Added for lists
-  department?: string; // Added for lists
+  email?: string;
+  department?: string;
 }
 
 export interface Course {
@@ -32,12 +32,6 @@ export interface Email {
   time: string;
   isRead: boolean;
   folder: 'inbox';
-}
-
-export interface AttendanceRecord {
-  studentId: string;
-  studentName: string;
-  weeks: boolean[];
 }
 export const SECTIONS = [
   'ICE-23-01', 'ICE-23-02', 'CSE-23-01', 'CSE-23-02',

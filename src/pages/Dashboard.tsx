@@ -3,10 +3,11 @@ import { Course } from '../types';
 
 const MOCK_COURSES: Course[] = [
   { id: '1', code: 'SOC3010', name: 'Operating System'},
-  { id: '2', code: 'CSE3020', name: 'Database Systems'},
-  { id: '3', code: 'ICE2010', name: 'Computer Architecture'},
-  { id: '4', code: 'MAT1010', name: 'Calculus I'},
-  { id: '5', code: 'PHY1010', name: 'General Physics'},
+  { id: '2', code: 'SOC3020', name: 'Database Systems'},
+  { id: '3', code: 'SOC3030', name: 'Computer Algorithm'},
+  { id: '4', code: 'NTS3032', name: 'History II'},
+  { id: '5', code: 'NTS3020', name: 'Engineering Communications'},
+  { id: '6', code: 'SOC3070', name: 'System Analysis'},
 ];
 
 export const Dashboard: React.FC = () => {

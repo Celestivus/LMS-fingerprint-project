@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User, UserRole, SECTIONS } from '../types';
 import { SECTION_EVENTS, DAYS, TIMES } from '../students';

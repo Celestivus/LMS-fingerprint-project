@@ -16,7 +16,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // quick local admin shortcut: admin/admin -> SYS_ADMIN
     if (id === 'admin' && password === 'admin') {
       const mapped: User = {
         id: 'admin',
@@ -28,7 +27,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       return;
     }
 
-    // quick local staff shortcut: staff/staff -> ACADEMIC_AFFAIRS
     if (id === 'staff' && password === 'staff') {
       const mapped: User = {
         id: 'staff',
@@ -118,8 +116,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               placeholder="ID" 
               value={id}
               onChange={(e) => setId(e.target.value)}
-              className="w-full bg-transparent border border-white text-white placeholder-gray-300 py-3 pl-10 pr-4 rounded focus:outline-none focus:ring-2 focus:ring-white/50"
-            />
+              className="w-full bg-transparent border border-white text-white placeholder-gray-300 py-3 pl-10 pr-4 rounded focus:outline-none focus:ring-2 focus:ring-white/50"/>
           </div>
 
           <div className="relative">
@@ -147,8 +144,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
 
           <div className="text-center mt-8 text-white/50 text-xs">
-             <p>Demo Credentials:</p>
-             <p>Student: U231... | Prof: P001... | Staff: S999... | Admin: admin</p>
+             <p>Hint:</p>
+             <p> AA: staff | Admin: admin</p>
           </div>
         </form>
       </div>

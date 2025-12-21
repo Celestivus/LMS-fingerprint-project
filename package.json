@@ -1,14 +1,14 @@
 {
-  "name": "inha-lms-electron",
+  "name": "Fingerpirnt LMS ",
   "version": "1.0.0",
-  "description": "Inha University LMS - Hybrid Desktop App",
+  "description": "Fingerprint verification with fingerprint",
   "main": "main.js",
   "scripts": {
     "start": "react-scripts start",
     "electron": "electron .",
     "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && npm run electron\""
   },
-  "author": "Inha Student",
+  "author": "IUT Students",
   "license": "ISC",
   "dependencies": {
     "lucide-react": "^0.344.0",

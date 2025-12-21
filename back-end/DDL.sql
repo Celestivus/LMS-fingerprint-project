@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS Attendance (
   id SERIAL PRIMARY KEY,
   student_id VARCHAR(10) NOT NULL,
   section_number VARCHAR(20) NOT NULL,
-  session_label VARCHAR(10) NOT NULL,  
+  session_label VARCHAR(10) NOT NULL,
   course_name VARCHAR(100),
-  attendance INT DEFAULT 0, 
+  attendance INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES Students(student_id),
   UNIQUE(student_id, section_number, session_label, course_name)

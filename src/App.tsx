@@ -7,7 +7,7 @@ import { Timetable } from './pages/Timetable';
 import { Inbox } from './pages/Inbox';
 import { ProfessorList } from './pages/ProfessorList';
 import { StudentListAdmin } from './pages/StudentListAdmin';
-import { SysAdmin } from './pages/SysAdmin';
+import {SysAdmin} from './pages/SysAdmin';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { User, UserRole } from './types';
