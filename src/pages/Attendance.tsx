@@ -29,7 +29,7 @@ const SESSIONS = WEEKS.flatMap(week => [
 const ProfessorAttendanceView: React.FC = () => {
     const [markingMode, setMarkingMode] = useState(false);
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
-    // Load attendance data from localStorage on mount
+    // Load attendance data from localStorage on mount (but can be cleared)
     const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>(() => {
         const saved = localStorage.getItem('professorAttendanceData');
         return saved ? JSON.parse(saved) : {};
@@ -44,6 +44,13 @@ const ProfessorAttendanceView: React.FC = () => {
     const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
 
     const [profViewStudents, setProfViewStudents] = React.useState<Array<{id:string;name:string;absences:number;email?:string}>>([]);
+
+    // Clear old localStorage cache on first mount
+    React.useEffect(() => {
+        console.log('Professor view mounted - clearing old localStorage cache');
+        localStorage.removeItem('professorAttendanceData');
+        setAttendanceData({});
+    }, []);
 
     // Request students list from server when section changes
     React.useEffect(() => {
@@ -107,9 +114,25 @@ const ProfessorAttendanceView: React.FC = () => {
         };
     }, [currentSection]);
 
-    // Fetch attendance for the current course when course or section changes
+    // Load attendance from localStorage on mount (instant display, no server wait)
     React.useEffect(() => {
-        console.log('Course or section changed, fetching attendance for:', currentCourse, currentSection);
+        const saved = localStorage.getItem('professorAttendanceData');
+        if (saved) {
+            try {
+                setAttendanceData(JSON.parse(saved));
+                console.log('Loaded attendance from localStorage on mount');
+            } catch (e) {
+                console.error('Failed to parse localStorage attendance data', e);
+            }
+        }
+    }, []);
+
+    // Fetch attendance for currently selected week/course ONLY (on-demand, not all weeks)
+    React.useEffect(() => {
+        console.log('Fetching attendance for current week:', currentCourse, currentSection, selectedSession);
+        
+        if (!selectedSession) return; // Don't fetch if no session selected
+        
         connectWS('127.0.0.1');
 
         const requestId = `${Date.now()}-${Math.floor(Math.random()*10000)}`;
@@ -119,18 +142,20 @@ const ProfessorAttendanceView: React.FC = () => {
         listener = (ev: MessageEvent) => {
             try {
                 const msg = JSON.parse(ev.data) as any;
-                if (msg && msg.type === 'attendance_data' && (msg.request_id === requestId || msg.request_id === undefined)) {
-                    console.log('Attendance data received for course:', currentCourse, msg);
+                if (msg && msg.type === 'attendance_data') {
+                    console.log('Attendance data received for week:', selectedSession, msg);
                     
                     if (msg.attendance && Array.isArray(msg.attendance)) {
-                        const newAttendanceData: Record<string, boolean> = {};
-                        msg.attendance.forEach((record: any) => {
-                            // Include course name in key to prevent cross-course data collision
-                            const key = `${record.student_id}-${record.session_label}-${record.course_name || currentCourse}`;
-                            newAttendanceData[key] = record.attendance === 0;
+                        setAttendanceData(prev => {
+                            const newData = { ...prev };
+                            msg.attendance.forEach((record: any) => {
+                                const key = `${record.student_id}-${record.session_label}-${record.course_name || currentCourse}`;
+                                newData[key] = record.attendance === 0;
+                                console.log(`Updated: ${key} = ${record.attendance === 0}`);
+                            });
+                            localStorage.setItem('professorAttendanceData', JSON.stringify(newData));
+                            return newData;
                         });
-                        setAttendanceData(newAttendanceData);
-                        localStorage.setItem('professorAttendanceData', JSON.stringify(newAttendanceData));
                     }
                     
                     if (listener && timeoutId) {
@@ -145,69 +170,50 @@ const ProfessorAttendanceView: React.FC = () => {
 
         addMessageListener(listener);
 
-        // Fetch all weeks for this course/section
-        const sessionLabels = SESSIONS.map(s => s.label);
-        let fetchedCount = 0;
+        // Get the session label for the selected session ID
+        const sessionLabel = SESSIONS.find(s => s.id === selectedSession)?.label;
+        if (!sessionLabel) return;
 
-        const fetchNextWeek = () => {
-            if (fetchedCount >= sessionLabels.length) {
-                console.log('All weeks fetched');
-                if (listener && timeoutId) {
-                    removeMessageListener(listener);
-                    clearTimeout(timeoutId);
-                }
-                return;
-            }
-
-            const week = sessionLabels[fetchedCount];
-            const payload = {
-                type: 'get_attendance_data',
-                section: currentSection,
-                course: currentCourse,
-                week: week,
-                request_id: requestId
-            };
-
-            let attempts = 0;
-            const interval = setInterval(() => {
-                const ws = getWS();
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    try {
-                        console.log('Fetching attendance for week:', week);
-                        ws.send(JSON.stringify(payload));
-                        clearInterval(interval);
-                        fetchedCount++;
-                        fetchNextWeek();
-                    } catch (e) {
-                        console.error('Failed to send request', e);
-                        clearInterval(interval);
-                    }
-                } else {
-                    attempts += 1;
-                    if (attempts >= 20) {
-                        clearInterval(interval);
-                        console.error('WebSocket unavailable');
-                        if (listener && timeoutId) {
-                            removeMessageListener(listener);
-                            clearTimeout(timeoutId);
-                        }
-                    }
-                }
-            }, 250);
+        const payload = {
+            type: 'get_attendance_data',
+            section: currentSection,
+            course: currentCourse,
+            week: sessionLabel,
+            request_id: requestId
         };
 
-        fetchNextWeek();
+        let attempts = 0;
+        const interval = setInterval(() => {
+            const ws = getWS();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    console.log('Fetching attendance for selected week:', sessionLabel);
+                    ws.send(JSON.stringify(payload));
+                    clearInterval(interval);
+                } catch (e) {
+                    console.error('Failed to send request', e);
+                    clearInterval(interval);
+                }
+            } else {
+                attempts += 1;
+                if (attempts >= 20) {
+                    clearInterval(interval);
+                    console.error('WebSocket unavailable');
+                }
+            }
+        }, 100);
 
         timeoutId = setTimeout(() => {
             console.warn('Attendance fetch timeout');
             if (listener) removeMessageListener(listener);
-        }, 30000);
+        }, 10000);
 
         return () => {
             if (listener) removeMessageListener(listener);
             if (timeoutId) clearTimeout(timeoutId);
+            clearInterval(interval);
         };
-    }, [currentCourse, currentSection]);
+    }, [currentCourse, currentSection, selectedSession]);
 
     const allowedSections = ['CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
 
@@ -513,36 +519,44 @@ const ProfessorAttendanceView: React.FC = () => {
 const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
     const [studentAttendance, setStudentAttendance] = useState<Record<string, number>>({});
     const [studentCourses, setStudentCourses] = useState<Array<{course: string, absences: number}>>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch student's attendance data on mount
+    // Fetch student's attendance data on mount and when explicitly refreshed
     React.useEffect(() => {
+        setIsLoading(true);
         connectWS('127.0.0.1');
 
         const listener = (ev: MessageEvent) => {
             try {
                 const msg = JSON.parse(ev.data);
-                console.log('Student view - message received:', msg.type);
+                console.log('Student view - raw message received:', msg);
                 
                 if (msg && msg.type === 'student_attendance_data') {
-                    console.log('Student attendance data received:', msg);
+                    console.log('✓ Matched student_attendance_data message');
+                    console.log('Full student attendance response:', msg);
                     
                     // Build attendance map: key = "course-week", value = attendance (0 or 1)
                     const attendanceMap: Record<string, number> = {};
                     const courseAbsences: Record<string, number> = {};
                     
                     if (msg.attendance && Array.isArray(msg.attendance)) {
+                        console.log(`Processing ${msg.attendance.length} attendance records`);
                         msg.attendance.forEach((record: any) => {
                             const key = `${record.course_name}-${record.session_label}`;
                             attendanceMap[key] = record.attendance;
+                            
+                            console.log(`✓ Record added: key="${key}", attendance=${record.attendance}`);
                             
                             // Count absences by course
                             if (record.attendance === 0) {
                                 courseAbsences[record.course_name] = (courseAbsences[record.course_name] || 0) + 1;
                             }
-                            console.log(`Student ${user.id} - ${record.course_name} week ${record.session_label}: attendance=${record.attendance}`);
                         });
+                    } else {
+                        console.warn('No attendance array in response');
                     }
                     
+                    console.log('Final attendanceMap:', attendanceMap);
                     setStudentAttendance(attendanceMap);
                     
                     // Build course list with absence counts (show all courses, even if no attendance data)
@@ -551,49 +565,54 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                         absences: courseAbsences[c.name] || 0
                     }));
                     setStudentCourses(courses);
-                    console.log('Student courses initialized:', courses);
+                    setIsLoading(false);
+                    console.log('✓ Student courses state updated:', courses);
                 }
             } catch (e) {
-                console.error('Invalid WS message', e);
+                console.error('Error parsing message:', e);
             }
         };
 
         addMessageListener(listener);
 
-        // Request student's attendance data
+        // Request student's attendance data with retry logic
         const payload = {
             type: 'get_student_attendance',
             student_id: user.id,
             section: user.section
         };
 
+        console.log('📤 Sending attendance request:', payload);
+
         let attempts = 0;
-        const maxAttempts = 40;
-        const interval = setInterval(() => {
+        const maxAttempts = 50;
+        const sendRequest = () => {
             const ws = getWS();
             if (ws && ws.readyState === WebSocket.OPEN) {
                 try {
-                    console.log('Requesting student attendance for:', user.id);
+                    console.log(`📡 WebSocket OPEN - sending request (attempt ${attempts + 1})`);
                     ws.send(JSON.stringify(payload));
-                    clearInterval(interval);
                 } catch (e) {
-                    console.error('Failed to send student attendance request', e);
-                    clearInterval(interval);
+                    console.error('❌ Failed to send student attendance request', e);
                 }
             } else {
                 attempts += 1;
+                console.log(`⏳ WebSocket not ready (state: ${ws?.readyState}), retry ${attempts}/${maxAttempts}`);
                 if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    console.error('WebSocket not available for student attendance');
+                    console.error('❌ WebSocket not available after 50 attempts for student attendance');
+                    setIsLoading(false);
+                    return;
                 }
+                setTimeout(sendRequest, 200);
             }
-        }, 250);
+        };
+
+        sendRequest();
 
         return () => {
             removeMessageListener(listener);
-            clearInterval(interval);
         };
-    }, [user.id]);
+    }, [user.id, user.section]);
 
     // Initialize studentCourses with all courses on mount if no data yet
     React.useEffect(() => {
@@ -617,8 +636,9 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                         <p className="text-xs text-gray-500">{user.id}</p>
                     </div>
                 </div>
-                <div className="flex-1 p-4 flex items-center justify-center">
+                <div className="flex-1 p-4 flex items-center justify-center gap-4">
                     <h1 className="text-3xl font-bold">My Attendance</h1>
+                    {isLoading && <span className="text-sm text-gray-500 animate-pulse">Loading...</span>}
                 </div>
                 <div className="w-32 flex-shrink-0 p-4 border-l-4 border-black flex items-center justify-center">
                      <h1 className="text-sm font-bold text-center">Total absences</h1>
@@ -642,36 +662,43 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                     </div>
 
                     <div className="bg-white pb-10">
-                        {studentCourses.map((courseData, idx) => (
-                            <div key={idx} className="flex border-b border-black h-14 hover:bg-slate-50 group">
-                                <div className="sticky left-0 z-30 bg-white w-96 shrink-0 border-r-4 border-black p-3 font-bold text-sm flex items-center justify-center text-center group-hover:bg-slate-50 h-full">
-                                    {courseData.course}
-                                </div>
-
-                                <div className="flex h-full">
-                                    {SESSIONS.map((session) => {
-                                        const key = `${courseData.course}-${session.label}`;
-                                        const attendance = studentAttendance[key];
-                                        const hasData = key in studentAttendance;
-                                        
-                                        return (
-                                            <div
-                                                key={session.id}
-                                                className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center h-full text-sm font-bold
-                                                    ${hasData && attendance === 1 ? 'bg-green-100' : ''}
-                                                    ${hasData && attendance === 0 ? 'bg-red-200' : ''}
-                                                    ${!hasData ? 'bg-gray-50' : ''}`}>
-                                                {hasData && (attendance === 1 ? <span className="text-green-600">1</span> : <span className="text-red-600">0</span>)}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="sticky right-0 z-30 bg-white w-32 shrink-0 flex items-center justify-center font-bold text-lg border-l-4 border-black group-hover:bg-slate-50 h-full">
-                                    {courseData.absences}
-                                </div>
+                        {studentCourses.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400">
+                                {isLoading ? 'Loading attendance data...' : 'No attendance records yet'}
                             </div>
-                        ))}
+                        ) : (
+                            studentCourses.map((courseData, idx) => (
+                                <div key={idx} className="flex border-b border-black h-14 hover:bg-slate-50 group">
+                                    <div className="sticky left-0 z-30 bg-white w-96 shrink-0 border-r-4 border-black p-3 font-bold text-sm flex items-center justify-center text-center group-hover:bg-slate-50 h-full">
+                                        {courseData.course}
+                                    </div>
+
+                                    <div className="flex h-full">
+                                        {SESSIONS.map((session) => {
+                                            const key = `${courseData.course}-${session.label}`;
+                                            const attendance = studentAttendance[key];
+                                            const hasData = key in studentAttendance;
+                                            
+                                            return (
+                                                <div
+                                                    key={session.id}
+                                                    className={`w-[50px] shrink-0 border-r border-gray-300 flex items-center justify-center h-full text-sm font-bold transition-colors
+                                                        ${hasData && attendance === 1 ? 'bg-green-200 text-green-700 border-green-400' : ''}
+                                                        ${hasData && attendance === 0 ? 'bg-red-300 text-red-700 border-red-400' : ''}
+                                                        ${!hasData ? 'bg-gray-100' : ''}`}
+                                                    title={hasData ? (attendance === 1 ? 'Present' : 'Absent') : 'No data'}>
+                                                    {hasData ? (attendance === 1 ? <span>✓</span> : <span>✕</span>) : <span className="text-gray-400">—</span>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="sticky right-0 z-30 bg-white w-32 shrink-0 flex items-center justify-center font-bold text-lg border-l-4 border-black group-hover:bg-slate-50 h-full">
+                                        {courseData.absences}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

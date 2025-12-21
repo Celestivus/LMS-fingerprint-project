@@ -406,10 +406,10 @@ async def handler(ws):
                             """
                             SELECT course_name, session_label, attendance 
                             FROM Attendance 
-                            WHERE student_id = %s AND section_number = %s
+                            WHERE student_id = %s
                             ORDER BY course_name, session_label
                             """,
-                            (student_id, section),
+                            (student_id,),
                         )
                         rows = cur.fetchall()
                         print(
@@ -453,6 +453,8 @@ async def handler(ws):
                 await ws.send(json.dumps(resp))
                 continue
 
+            # Handle request for attendance by section/course/week (for professor view)
+            if isinstance(data, dict) and data.get("type") == "get_attendance_data":
                 section = data.get("section")
                 course = data.get("course")
                 week = data.get("week")
@@ -480,9 +482,10 @@ async def handler(ws):
 
                         cur.execute(
                             """
-                            SELECT student_id, session_label, attendance 
+                            SELECT student_id, session_label, course_name, attendance 
                             FROM Attendance 
                             WHERE section_number = %s AND course_name = %s AND session_label = %s
+                            ORDER BY student_id
                             """,
                             (section, course, week),
                         )
@@ -500,11 +503,12 @@ async def handler(ws):
                                 {
                                     "student_id": r[0],
                                     "session_label": r[1],
-                                    "attendance": r[2],
+                                    "course_name": r[2],
+                                    "attendance": r[3],
                                 }
                             )
                             print(
-                                f"  >> Record: student_id={r[0]}, session_label={r[1]}, attendance={r[2]}"
+                                f"  >> Record: student_id={r[0]}, session_label={r[1]}, course_name={r[2]}, attendance={r[3]}"
                             )
 
                         return {"success": True, "attendance": attendance_list}
