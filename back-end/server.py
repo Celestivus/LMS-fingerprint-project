@@ -7,7 +7,8 @@ import psycopg2
 import io
 from PIL import Image
 import numpy as np
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 
 # DB config (matches usb scripts)
 DB_CONFIG = {
@@ -64,6 +65,19 @@ def compare_fingerprints(
         return False
 
 
+def convert_decimal_to_float(obj):
+    """Recursively convert Decimal and date objects to JSON-serializable types"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {key: convert_decimal_to_float(val) for key, val in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_decimal_to_float(item) for item in obj]
+    return obj
+
+
 connected = set()
 
 
@@ -82,6 +96,7 @@ async def handler(ws):
                 msg_type = data.get("type") if isinstance(data, dict) else "unknown"
                 print(f"Message type: {msg_type}")
 
+                # Explicit check for get_students_by_section
                 if msg_type == "get_students_by_section":
                     print(">>> MATCHED get_students_by_section!")
 
@@ -306,38 +321,43 @@ async def handler(ws):
             # Handle request for students by section
             if isinstance(data, dict) and data.get("type") == "get_students_by_section":
                 section = data.get("section")
-                print(f">>> get_students_by_section handler reached for section: {section}")
+                print(
+                    f">>> get_students_by_section handler reached for section: {section}"
+                )
 
                 loop = asyncio.get_running_loop()
 
                 def fetch_students(section):
                     try:
-                        print(f"  >> Querying students for section {section}")
-                        conn = psycopg2.connect(**DB_CONFIG)
+                        print(f"  >> Connecting to DB for section {section}")
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
                         cur = conn.cursor()
-                        cur.execute("""
-                            SELECT student_id AS id, full_name AS name, section_number AS section, email
-                            FROM Students
-                            WHERE section_number = %s
-                            ORDER BY student_id
-                        """, (section,))
+                        cur.execute(
+                            "SELECT student_id, full_name, section_number, email FROM Students WHERE section_number = %s ORDER BY full_name",
+                            (section,),
+                        )
                         rows = cur.fetchall()
-                        students = [
-                            {
-                                'id': row[0],
-                                'name': row[1],
-                                'section': row[2],
-                                'email': row[3] or '—'
-                            } for row in rows
-                        ]
-                        print(f"  >> Found {len(students)} students")
-                        return {
-                            'type': 'students_list',
-                            'students': students
-                        }
+                        print(f"  >> DB returned {len(rows)} rows")
+                        students = []
+                        for r in rows:
+                            students.append(
+                                {
+                                    "id": r[0],
+                                    "name": r[1],
+                                    "section": r[2],
+                                    "email": r[3],
+                                }
+                            )
+                        return {"success": True, "students": students}
                     except Exception as e:
-                        print(f"  >> DB error fetching students: {e}")
-                        return {'type': 'error', 'message': str(e)}
+                        print("  >> DB error fetching students:", e)
+                        return {"success": False, "error": str(e)}
                     finally:
                         try:
                             cur.close()
@@ -348,83 +368,36 @@ async def handler(ws):
                         except:
                             pass
 
-                response = await loop.run_in_executor(None, fetch_students, section)
-                await ws.send(json.dumps(response))
+                result = await loop.run_in_executor(None, fetch_students, section)
+                if result.get("success"):
+                    resp = {
+                        "type": "students_list",
+                        "section": section,
+                        "students": result.get("students"),
+                    }
+                    print(
+                        f"Sending {len(result.get('students', []))} students for section {section}"
+                    )
+                else:
+                    resp = {
+                        "type": "students_list",
+                        "section": section,
+                        "students": [],
+                        "error": result.get("error"),
+                    }
+                    print(
+                        f"Error fetching students for {section}: {result.get('error')}"
+                    )
+
+                print("Response:", json.dumps(resp))
+                await ws.send(json.dumps(resp))
                 continue
 
-                # Sysadmin DB page
-                if isinstance(data, dict) and data.get("type") == "get_table_data":
-                    table = data.get("table")
-                    print(f">>> SysAdmin requested table: {table}")
-
-                    ALLOWED_TABLES = {
-                        "students": """
-                                        SELECT student_id, full_name, level, branch, date_of_birth, 
-                                               section_number, email, telephone_number
-                                        FROM Students
-                                        ORDER BY student_id
-                                    """,
-                        "professors": """
-                                        SELECT professor_id, full_name, design, department, 
-                                               address, office_location, email, telephone_number
-                                        FROM Professors
-                                        ORDER BY professor_id
-                                    """,
-                        "attendance": """
-                                        SELECT id, student_id, section_number, course_name, 
-                                               session_label, attendance, created_at
-                                        FROM Attendance
-                                        ORDER BY created_at DESC
-                                        LIMIT 1000
-                                    """
-                    }
-
-                    if table not in ALLOWED_TABLES:
-                        await ws.send(json.dumps({
-                            "type": "table_data",
-                            "success": False,
-                            "error": "Invalid table requested"
-                        }))
-                        print("  >> Invalid table")
-                        continue
-
-                    loop = asyncio.get_running_loop()
-
-                    def fetch_table():
-                        try:
-                            conn = psycopg2.connect(**DB_CONFIG)
-                            cur = conn.cursor()
-                            cur.execute(ALLOWED_TABLES[table])
-                            columns = [desc[0] for desc in cur.description]
-                            rows = cur.fetchall()
-                            data_rows = [dict(zip(columns, row)) for row in rows]
-                            print(f"  >> SUCCESS: Fetched {len(data_rows)} rows from {table}")
-                            return {"success": True, "rows": data_rows}
-                        except Exception as e:
-                            print(f"  >> ERROR fetching {table}: {e}")
-                            return {"success": False, "error": str(e)}
-                        finally:
-                            try:
-                                cur.close()
-                            except:
-                                pass
-                            try:
-                                conn.close()
-                            except:
-                                pass
-
-                    result = await loop.run_in_executor(None, fetch_table)
-
-                    await ws.send(json.dumps({
-                        "type": "table_data",
-                        "success": result["success"],
-                        "rows": result.get("rows", []),
-                        "error": result.get("error")
-                    }))
-                    continue
-
-            # Professor list
-            if isinstance(data, dict) and data.get("type") == "get_professors_by_department":
+            # Handle request for professors by department
+            if (
+                isinstance(data, dict)
+                and data.get("type") == "get_professors_by_department"
+            ):
                 department = data.get("department")
                 print(
                     f">>> get_professors_by_department handler reached for department: {department}"
@@ -435,27 +408,424 @@ async def handler(ws):
                 def fetch_professors(department):
                     try:
                         print(f"  >> Connecting to DB for department {department}")
-                        conn = psycopg2.connect(**DB_CONFIG)
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
                         cur = conn.cursor()
-                        cur.execute("""
-                            SELECT professor_id AS id, full_name AS name, email
-                            FROM Professors
-                            WHERE department = %s
-                        """, (department,))
-                        professors = cur.fetchall()
+                        cur.execute(
+                            "SELECT professor_id, full_name, department, email FROM Professors WHERE department = %s ORDER BY full_name",
+                            (department,),
+                        )
+                        rows = cur.fetchall()
+                        print(f"  >> DB returned {len(rows)} rows")
+                        professors = []
+                        for r in rows:
+                            professors.append(
+                                {
+                                    "id": r[0],
+                                    "name": r[1],
+                                    "department": r[2],
+                                    "email": r[3],
+                                }
+                            )
+                        return {"success": True, "professors": professors}
+                    except Exception as e:
+                        print("  >> DB error fetching professors:", e)
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(None, fetch_professors, department)
+                if result.get("success"):
+                    resp = {
+                        "type": "professors_list",
+                        "department": department,
+                        "professors": result.get("professors"),
+                    }
+                    print(
+                        f"Sending {len(result.get('professors', []))} professors for department {department}"
+                    )
+                else:
+                    resp = {
+                        "type": "professors_list",
+                        "department": department,
+                        "professors": [],
+                        "error": result.get("error"),
+                    }
+                    print(
+                        f"Error fetching professors for {department}: {result.get('error')}"
+                    )
+
+                print("Response:", json.dumps(resp))
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle request for student's own attendance data
+            if isinstance(data, dict) and data.get("type") == "get_student_attendance":
+                student_id = data.get("student_id")
+                section = data.get("section")
+
+                print(
+                    f">>> Get student attendance: student_id={student_id}, section={section}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def fetch_student_attendance(student_id, section):
+                    try:
+                        print(f"  >> Fetching attendance for student {student_id}")
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        cur.execute(
+                            """
+                            SELECT course_name, session_label, attendance 
+                            FROM Attendance 
+                            WHERE student_id = %s
+                            ORDER BY course_name, session_label
+                            """,
+                            (student_id,),
+                        )
+                        rows = cur.fetchall()
+                        print(
+                            f"  >> Found {len(rows)} attendance records for student {student_id}"
+                        )
+
+                        attendance_list = []
+                        for r in rows:
+                            attendance_list.append(
+                                {
+                                    "course_name": r[0],
+                                    "session_label": r[1],
+                                    "attendance": r[2],
+                                }
+                            )
+                            print(f"  >> Record: {r[0]} week {r[1]}: attendance={r[2]}")
+
+                        return {"success": True, "attendance": attendance_list}
+                    except Exception as e:
+                        print(f"  >> DB error fetching student attendance: {e}")
+                        return {"success": False, "error": str(e), "attendance": []}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(
+                    None, fetch_student_attendance, student_id, section
+                )
+                resp = {
+                    "type": "student_attendance_data",
+                    "student_id": student_id,
+                    "attendance": result.get("attendance", []),
+                }
+
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle request for attendance by section/course/week (for professor view)
+            if isinstance(data, dict) and data.get("type") == "get_attendance_data":
+                section = data.get("section")
+                course = data.get("course")
+                week = data.get("week")
+                request_id = data.get("request_id")
+
+                print(
+                    f">>> Get attendance data: section={section}, course={course}, week={week}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def fetch_attendance(section, course, week):
+                    try:
+                        print(
+                            f"  >> Fetching attendance from DB with: section={section}, course={course}, week={week}"
+                        )
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        # If week is 'ALL', fetch all weeks for the course/section
+                        if week == "ALL":
+                            cur.execute(
+                                """
+                                SELECT student_id, session_label, course_name, attendance 
+                                FROM Attendance 
+                                WHERE section_number = %s AND course_name = %s
+                                ORDER BY student_id, session_label
+                                """,
+                                (section, course),
+                            )
+                        else:
+                            cur.execute(
+                                """
+                                SELECT student_id, session_label, course_name, attendance 
+                                FROM Attendance 
+                                WHERE section_number = %s AND course_name = %s AND session_label = %s
+                                ORDER BY student_id
+                                """,
+                                (section, course, week),
+                            )
+
+                        rows = cur.fetchall()
+                        print(
+                            f"  >> Query executed. Found {len(rows)} attendance records"
+                        )
+
+                        attendance_list = []
+                        for r in rows:
+                            attendance_list.append(
+                                {
+                                    "student_id": r[0],
+                                    "session_label": r[1],
+                                    "course_name": r[2],
+                                    "attendance": r[3],
+                                }
+                            )
+
+                        return {"success": True, "attendance": attendance_list}
+                    except Exception as e:
+                        print(f"  >> DB error fetching attendance: {e}")
+                        return {"success": False, "error": str(e), "attendance": []}
+                    finally:
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                result = await loop.run_in_executor(
+                    None, fetch_attendance, section, course, week
+                )
+                resp = {
+                    "type": "attendance_data",
+                    "section": section,
+                    "course": course,
+                    "week": week,
+                    "attendance": result.get("attendance", []),
+                }
+                if request_id is not None:
+                    resp["request_id"] = request_id
+
+                await ws.send(json.dumps(resp))
+                continue
+
+            if (
+                isinstance(data, dict)
+                and data.get("type") == "upload_fingerprint_attendance"
+            ):
+                fingerprints = data.get("fingerprints", [])  # List of {name, base64}
+                section = data.get("section")
+                week = data.get("week")  # e.g., "5.1", "5.2"
+                course = data.get("course")
+                request_id = data.get("request_id")
+
+                print(
+                    f">>> Fingerprint attendance upload: {len(fingerprints)} files for {section}, week {week}, course {course}"
+                )
+
+                loop = asyncio.get_running_loop()
+
+                def process_fingerprint_attendance(section, week, course, fingerprints):
+                    try:
+                        conn = psycopg2.connect(
+                            host=DB_CONFIG["host"],
+                            database=DB_CONFIG["dbname"],
+                            user=DB_CONFIG["user"],
+                            password=DB_CONFIG["password"],
+                            port=DB_CONFIG["port"],
+                        )
+                        cur = conn.cursor()
+
+                        # Fetch all students in section with their fingerprints
+                        print(f"  >> Fetching students from section {section}")
+                        cur.execute(
+                            "SELECT student_id, full_name, fingerprint FROM Students WHERE section_number = %s",
+                            (section,),
+                        )
+                        students = cur.fetchall()
+                        print(f"  >> Found {len(students)} students in section")
+
+                        results = []
+
+                        # Process each uploaded fingerprint
+                        for fp in fingerprints:
+                            filename = fp.get(
+                                "name", "unknown"
+                            )  # e.g., "student001.bmp"
+                            fp_base64 = fp.get("base64", "")
+
+                            # Decode uploaded fingerprint
+                            try:
+                                match = re.match(
+                                    r"data:image/.+;base64,(.*)", fp_base64
+                                )
+                                if match:
+                                    fp_bytes = base64.b64decode(match.group(1))
+                                else:
+                                    fp_bytes = base64.b64decode(fp_base64)
+                            except Exception as e:
+                                print(
+                                    f"  >> Error decoding fingerprint {filename}: {e}"
+                                )
+                                results.append(
+                                    {
+                                        "filename": filename,
+                                        "matched": False,
+                                        "error": str(e),
+                                    }
+                                )
+                                continue
+
+                            # Compare against each student's fingerprint
+                            matched_student = None
+                            for student_id, full_name, db_fp_bytes in students:
+                                if db_fp_bytes is None:
+                                    continue
+
+                                if compare_fingerprints(
+                                    fp_bytes, db_fp_bytes, threshold=0.99
+                                ):
+                                    matched_student = (student_id, full_name)
+                                    print(
+                                        f"  >> Matched {filename} to {student_id} ({full_name})"
+                                    )
+                                    break
+
+                            if matched_student:
+                                student_id, full_name = matched_student
+                                # Record attendance: 1 = present
+                                print(
+                                    f"  >> Inserting attendance: student_id={student_id}, section={section}, week={week}, course={course}, attendance=1"
+                                )
+                                cur.execute(
+                                    """
+                                    INSERT INTO Attendance (student_id, section_number, session_label, course_name, attendance)
+                                    VALUES (%s, %s, %s, %s, 1)
+                                    ON CONFLICT (student_id, section_number, session_label, course_name) 
+                                    DO UPDATE SET attendance = 1
+                                    """,
+                                    (student_id, section, week, course),
+                                )
+                                results.append(
+                                    {
+                                        "filename": filename,
+                                        "matched": True,
+                                        "student_id": student_id,
+                                        "name": full_name,
+                                    }
+                                )
+                            else:
+                                print(f"  >> No match found for {filename}")
+                                results.append({"filename": filename, "matched": False})
+
+                        # Record absences (0) for students NOT in matched list
+                        matched_ids = [
+                            r["student_id"] for r in results if r.get("matched")
+                        ]
+                        if matched_ids:
+                            placeholders = ",".join(["%s"] * len(matched_ids))
+                            cur.execute(
+                                f"""
+                                INSERT INTO Attendance (student_id, section_number, session_label, course_name, attendance)
+                                SELECT student_id, %s, %s, %s, 0
+                                FROM Students
+                                WHERE section_number = %s AND student_id NOT IN ({placeholders})
+                                ON CONFLICT (student_id, section_number, session_label, course_name)
+                                DO UPDATE SET attendance = 0
+                                """,
+                                [section, week, course, section] + matched_ids,
+                            )
+                        else:
+                            # No matched students: mark all students in the section as absent (0)
+                            cur.execute(
+                                """
+                                INSERT INTO Attendance (student_id, section_number, session_label, course_name, attendance)
+                                SELECT student_id, %s, %s, %s, 0
+                                FROM Students
+                                WHERE section_number = %s
+                                ON CONFLICT (student_id, section_number, session_label, course_name)
+                                DO UPDATE SET attendance = 0
+                                """,
+                                (section, week, course, section),
+                            )
+
+                        conn.commit()
+                        print(
+                            f"  >> Attendance recorded for {len(matched_ids)} present, {len(students) - len(matched_ids)} absent"
+                        )
                         return {
-                            'type': 'professors_list',
-                            'professors': [{'id': row[0], 'name': row[1], 'email': row[2], 'department': department} for row in professors]
+                            "success": True,
+                            "results": results,
+                            "matched_count": len(matched_ids),
+                            "total_students": len(students),
                         }
                     except Exception as e:
-                        print(f"Error: {e}")
-                        return {'type': 'error', 'message': str(e)}
+                        print(f"  >> Error processing fingerprint attendance: {e}")
+                        return {"success": False, "error": str(e)}
                     finally:
-                        cur.close()
-                        conn.close()
+                        try:
+                            cur.close()
+                        except:
+                            pass
+                        try:
+                            conn.close()
+                        except:
+                            pass
 
-                response = await loop.run_in_executor(None, fetch_professors, department)
-                await ws.send(json.dumps(response))
+                result = await loop.run_in_executor(
+                    None,
+                    process_fingerprint_attendance,
+                    section,
+                    week,
+                    course,
+                    fingerprints,
+                )
+                resp = {
+                    "type": "fingerprint_attendance_response",
+                    "success": result.get("success"),
+                    "matched_count": result.get("matched_count", 0),
+                    "total_students": result.get("total_students", 0),
+                    "results": (
+                        result.get("results", []) if result.get("success") else []
+                    ),
+                }
+                if request_id is not None:
+                    resp["request_id"] = request_id
+                if not result.get("success"):
+                    resp["error"] = result.get("error")
+
+                await ws.send(json.dumps(resp))
                 continue
 
             # Handle medical certification upload from student
@@ -771,6 +1141,81 @@ async def handler(ws):
                     "success": result.get("success"),
                     "message": result.get("message") or result.get("error"),
                 }
+                await ws.send(json.dumps(resp))
+                continue
+
+            # Handle get_database_tables (admin only)
+            if isinstance(data, dict) and data.get("type") == "get_database_tables":
+                print(">>> Fetching all database tables")
+                try:
+                    conn = psycopg2.connect(**DB_CONFIG)
+                    cur = conn.cursor()
+
+                    # Get all table names
+                    cur.execute(
+                        """
+                        SELECT table_name FROM information_schema.tables 
+                        WHERE table_schema='public' ORDER BY table_name
+                        """
+                    )
+                    tables = [row[0] for row in cur.fetchall()]
+                    print(f"  >> Found tables: {tables}")
+
+                    # Get data from each table
+                    all_tables = {}
+                    for table_name in tables:
+                        try:
+                            # Get column names
+                            cur.execute(
+                                f"""
+                                SELECT column_name FROM information_schema.columns 
+                                WHERE table_name = %s ORDER BY ordinal_position
+                                """,
+                                (table_name,)
+                            )
+                            columns = [row[0] for row in cur.fetchall()]
+
+                            # Get first 100 rows from table
+                            cur.execute(f"SELECT * FROM {table_name} LIMIT 100")
+                            rows = cur.fetchall()
+
+                            # Convert to list of dicts
+                            table_data = [
+                                dict(zip(columns, row))
+                                for row in rows
+                            ]
+
+                            # Convert Decimal and date values to JSON-serializable types
+                            table_data = convert_decimal_to_float(table_data)
+
+                            all_tables[table_name] = {
+                                "columns": columns,
+                                "rows": table_data,
+                                "row_count": len(table_data)
+                            }
+                            print(f"  >> Table {table_name}: {len(table_data)} rows (first 100)")
+
+                        except Exception as e:
+                            print(f"  >> Error reading table {table_name}: {e}")
+                            all_tables[table_name] = {"error": str(e), "columns": [], "rows": []}
+
+                    cur.close()
+                    conn.close()
+                    
+                    resp = {
+                        "type": "database_tables_response",
+                        "success": True,
+                        "data": all_tables
+                    }
+                except Exception as e:
+                    print(f"  >> Error getting database tables: {e}")
+                    resp = {
+                        "type": "database_tables_response",
+                        "success": False,
+                        "error": str(e)
+                    }
+                
+                resp = convert_decimal_to_float(resp)
                 await ws.send(json.dumps(resp))
                 continue
 
