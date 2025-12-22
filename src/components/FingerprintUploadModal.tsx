@@ -74,8 +74,7 @@ export const FingerprintUploadModal: React.FC<FingerprintUploadModalProps> = ({
         })
       );
 
-      // Send to server
-      connectWS('127.0.0.1');
+      connectWS('192.168.16.217');
 
       const requestId = `${Date.now()}-${Math.floor(Math.random()*10000)}`;
 

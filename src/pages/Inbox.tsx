@@ -34,12 +34,10 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const filteredEmails = MOCK_EMAILS.filter(e => e.folder === selectedFolder);
-  
-  // Fetch pending certifications
+
   useEffect(() => {
-    connectWS('127.0.0.1');
-    
-    // DISPLAY CERTIFICATIONS
+    connectWS('192.168.16.217');
+
     const listener = (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data);
@@ -136,7 +134,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
     if (email.sender === 'System' && selectedCert) {
         return (
             <div className="w-full h-full flex flex-col bg-white border border-gray-200 shadow-sm overflow-hidden">
-                {/* Custom Header for Medical Cert */}
                 <div className="p-4 border-b-2 border-black bg-gray-50 grid grid-cols-2 gap-x-8 gap-y-2 text-sm font-bold">
                     <div>Student ID: <span className="font-normal ml-2">{selectedCert.student_id}</span></div>
                     <div>Course: <span className="font-normal ml-2">{selectedCert.course_name}</span></div>
@@ -146,7 +143,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
                 </div>
 
                 <div className="flex-1 p-8 flex flex-col overflow-y-auto">
-                    {/* Certificate Preview */}
                     <div className="w-full max-w-2xl bg-white shadow-lg border border-gray-300 p-8 mb-8 mx-auto relative">
                         <div className="absolute top-4 left-4 w-16 h-16 rounded-full border-4 border-blue-200 flex items-center justify-center">
                         </div>
@@ -158,7 +154,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
                         </div>
                     </div>
 
-                    {/* Notes Section */}
                     <div className="w-full max-w-2xl mx-auto mb-6">
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                             Your Notes
@@ -168,19 +163,16 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
                             onChange={(e) => setCertNotes(e.target.value)}
                             disabled={isProcessing}
                             placeholder="Add notes for your decision..."
-                            className="w-full h-20 p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                        />
+                            className="w-full h-20 p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"/>
                     </div>
 
                     {message && (
                         <div className={`w-full max-w-2xl mx-auto mb-4 p-3 rounded text-sm font-medium ${
                             message.type === 'success'
                                 ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
-                        }`}>
+                                : 'bg-red-100 text-red-700'}`}>
                             {message.text}
-                        </div>
-                    )}
+                        </div>)}
 
                     <div className="w-full max-w-2xl mx-auto flex gap-8">
                         <button 
@@ -201,7 +193,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
         );
     }
 
-    // Default Email View
     return (
         <div className="w-full h-full flex flex-col bg-white border border-gray-200 shadow-sm p-6 max-w-3xl">
             <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -224,7 +215,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
 
   return (
     <div className="flex h-[calc(100vh-180px)] border-t-2 border-black">
-      {/* Left Sidebar - Folders */}
       <div className="w-64 border-r-2 border-black bg-white flex flex-col">
         <div className="flex-1 overflow-y-auto">
             <div className="mt-4">
@@ -243,17 +233,15 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Middle Column - Email List */}
+      {/*  Email List */}
       <div className="w-96 border-r-2 border-black bg-white overflow-y-auto scrollbar-hide flex flex-col">
-        {/* Tabs - Only show certifications tab for professors */}
         <div className="flex border-b-2 border-black sticky top-0 bg-white z-10">
           <button
             onClick={() => {
               setSelectedEmail(filteredEmails[0] || null);
               setSelectedCert(null);
             }}
-            className={`flex-1 p-3 font-bold border-b-2 ${selectedEmail && !selectedCert ? 'border-blue-500 text-blue-600' : 'border-transparent'}`}
-          >
+            className={`flex-1 p-3 font-bold border-b-2 ${selectedEmail && !selectedCert ? 'border-blue-500 text-blue-600' : 'border-transparent'}`}>
             Emails
           </button>
           {user.role !== 'student' && (
@@ -262,8 +250,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
                 setSelectedEmail(null);
                 setSelectedCert(certifications[0] || null);
               }}
-              className={`flex-1 p-3 font-bold border-b-2 relative ${selectedCert ? 'border-blue-500 text-blue-600' : 'border-transparent'}`}
-            >
+              className={`flex-1 p-3 font-bold border-b-2 relative ${selectedCert ? 'border-blue-500 text-blue-600' : 'border-transparent'}`}>
               Certifications {certifications.length > 0 && (
                 <span className="absolute top-1 right-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
                   {certifications.length}
@@ -298,7 +285,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
           </>
         )}
 
-        {/* Certification List - Only for professors */}
+        {/* Certification List*/}
         {user.role !== 'student' && selectedCert !== null && (
           <>
             <div className="p-3 border-b-2 border-black bg-blue-50 sticky top-12">
@@ -313,8 +300,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
                   onClick={() => setSelectedCert(cert)}
                   className={`w-full p-4 border-b border-gray-300 text-left hover:bg-blue-50 transition-colors ${
                     selectedCert?.id === cert.id ? 'bg-blue-100' : ''
-                  }`}
-                >
+                  }`}>
                   <div className="font-bold text-sm text-gray-800">{cert.student_id}</div>
                   <div className="text-xs text-gray-600">{cert.course_name}</div>
                   <div className="text-xs text-gray-600">Week {cert.session_label}</div>
@@ -328,7 +314,6 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
         )}
       </div>
 
-      {/* Right Column - Reading Pane */}
       <div className="flex-1 bg-gray-50 p-8 flex flex-col items-center justify-center relative overflow-hidden">
         {selectedEmail ? renderEmailContent(selectedEmail) : selectedCert && user.role !== 'student' ? renderEmailContent(MOCK_EMAILS[0]) : (
             <div className="text-center opacity-40">

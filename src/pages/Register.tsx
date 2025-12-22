@@ -11,7 +11,6 @@ export const Register: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
       fullName: '',
       userId: '',

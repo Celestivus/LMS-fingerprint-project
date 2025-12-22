@@ -8,6 +8,7 @@ const MOCK_COURSES: Course[] = [
   { id: '4', code: 'NTS3032', name: 'History II'},
   { id: '5', code: 'NTS3020', name: 'Engineering Communications'},
   { id: '6', code: 'SOC3070', name: 'System Analysis'},
+  { id: '7', code: 'SOC3070', name: 'Introduction to Economics'},
 ];
 
 export const Dashboard: React.FC = () => {

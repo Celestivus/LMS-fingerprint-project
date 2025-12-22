@@ -24,7 +24,6 @@ export const SysAdmin: React.FC = () => {
           if (data.success && data.data) {
             setTables(data.data);
             setError(null);
-            // Set first table as selected
             const tableNames = Object.keys(data.data);
             if (tableNames.length > 0) {
               setSelectedTable(tableNames[0]);
@@ -39,7 +38,7 @@ export const SysAdmin: React.FC = () => {
       }
     };
 
-    // Sending request to get database tables
+    // Request to tables
     const ws = getWS();
     if (ws) {
       addMessageListener(handleTablesResponse);
@@ -77,7 +76,6 @@ export const SysAdmin: React.FC = () => {
 
   return (
     <div className="flex h-full bg-gray-900 text-gray-300 font-mono">
-      {/* Sidebar with table list */}
       <div className="w-48 border-r border-green-700 overflow-y-auto bg-gray-950">
         <div className="p-4 border-b border-green-700">
           <h2 className="text-green-400 text-sm font-bold">TABLES ({tableNames.length})</h2>
@@ -99,7 +97,6 @@ export const SysAdmin: React.FC = () => {
         </div>
       </div>
 
-      {/* Main content */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {selectedTable && tables[selectedTable] && (
           <TableViewer
@@ -161,13 +158,11 @@ function TableViewer({ tableName, tableData }: TableViewerProps) {
                   key={idx}
                   className={`border-b border-green-900 ${
                     idx % 2 === 0 ? 'bg-gray-950' : 'bg-gray-900'
-                  } hover:bg-gray-800`}
-                >
+                  } hover:bg-gray-800`}>
                   {tableData.columns.map((col) => (
                     <td
                       key={col}
-                      className="px-4 py-2 border-r border-green-900 last:border-r-0 break-words max-w-xs"
-                    >
+                      className="px-4 py-2 border-r border-green-900 last:border-r-0 break-words max-w-xs">
                       {formatCellValue(row[col])}
                     </td>
                   ))}

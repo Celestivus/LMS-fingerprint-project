@@ -1,27 +1,20 @@
 {
-  "name": "Fingerpirnt LMS ",
-  "version": "1.0.0",
-  "description": "Fingerprint verification with fingerprint",
-  "main": "main.js",
+  "name": "USB Team Project",
   "scripts": {
     "start": "react-scripts start",
-    "electron": "electron .",
-    "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && npm run electron\""
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
-  "author": "IUT Students",
-  "license": "ISC",
   "dependencies": {
-    "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0"
+    "react-router-dom": "^6.22.0",
+    "lucide-react": "^0.344.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "electron": "^39.2.6",
-    "react-scripts": "^5.0.1",
     "tailwindcss": "^3.4.1",
-    "wait-on": "^7.2.0"
+    "react-scripts": "5.0.1"
   },
   "browserslist": {
     "production": [

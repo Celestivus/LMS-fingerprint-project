@@ -10,7 +10,6 @@ export const StudentListAdmin: React.FC = () => {
   const [students, setStudents] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch students when section changes
   useEffect(() => {
     setLoading(true);
     const handleStudentsList = (ev: MessageEvent) => {
@@ -50,7 +49,6 @@ export const StudentListAdmin: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-        {/* Header */}
          <div className="flex items-center justify-between px-8 py-6 border-b-4 border-black">
             <div className="flex items-center gap-4 relative">
                 <h1

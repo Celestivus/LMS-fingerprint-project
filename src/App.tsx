@@ -18,7 +18,7 @@ const AppContent: React.FC = () => {
     const navigate = useNavigate();
 
     // useEffect(() => {
-    connectWS("127.0.0.1");
+    connectWS("192.168.16.217");
     // return () => {
     //     const ws = getWS();
     //     if (ws) ws.close();

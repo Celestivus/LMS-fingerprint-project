@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState} from 'react';
 import { User, UserRole} from '../types';
-import { Upload, ChevronDown } from 'lucide-react';
+import {ChevronDown } from 'lucide-react';
 import { FingerprintUploadModal } from '../components/FingerprintUploadModal';
 import { MedicalCertificationModal } from '../components/MedicalCertificationModal';
 import { connectWS, getWS, addMessageListener, removeMessageListener } from '../ws';
@@ -10,13 +10,13 @@ interface AttendanceProps {
 }
 
 const STUDENT_VIEW_COURSES = [
-    { name: 'Database', absences: [3] },
+    { name: 'Database', absences: [] },
     { name: 'Operating System', absences: [] },
-    { name: 'System Analysis', absences: [14] },
+    { name: 'System Analysis', absences: [] },
     { name: 'Engineering Communications', absences: [] },
     { name: 'Computer Algorithm', absences: [] },
     { name: 'History 2', absences: [] },
-    { name: 'Academic English', absences: [] },
+    { name: 'Introduction to Economics', absences: [] },
 ];
 
 const WEEKS = Array.from({ length: 15 }, (_, i) => i + 1);
@@ -44,7 +44,7 @@ const ProfessorAttendanceView: React.FC = () => {
     
     React.useEffect(() => {
         // Displays students while entering attendance window (professor)
-        connectWS('127.0.0.1');
+        connectWS('192.168.16.217');
 
         const listener = (ev: MessageEvent) => {
             try {
@@ -103,9 +103,8 @@ const ProfessorAttendanceView: React.FC = () => {
         };
     }, [currentSection]);
 
-    // Requesting professors attendance page after cert send
     React.useEffect(() => {
-        connectWS('127.0.0.1');
+        connectWS('192.168.16.217');
 
         const certListener = (ev: MessageEvent) => {
             try {
@@ -166,7 +165,7 @@ const ProfessorAttendanceView: React.FC = () => {
             return newData;
         });
         
-        connectWS('127.0.0.1');
+        connectWS('192.168.16.217');
 
         const listener = (ev: MessageEvent) => {
             try {
@@ -284,7 +283,7 @@ const ProfessorAttendanceView: React.FC = () => {
 
         setTimeout(() => {
             // Fetch attendance data from DB for this week/course/section
-            connectWS('127.0.0.1');
+            connectWS('192.168.16.217');
             
             const requestId = `${Date.now()}-${Math.floor(Math.random()*10000)}`;
 
@@ -534,7 +533,7 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
     // Fetch student's attendance data on mount and when explicitly refreshed
     React.useEffect(() => {
         setIsLoading(true);
-        connectWS('127.0.0.1');
+        connectWS('192.168.16.217');
 
         const listener = (ev: MessageEvent) => {
             try {

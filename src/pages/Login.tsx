@@ -97,7 +97,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       addMessageListener(listener);
 
-      // safety timeout: remove listener after 6s
       setTimeout(() => removeMessageListener(listener), 6000);
     }
   };
@@ -128,14 +127,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               placeholder="PASSWORD" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent border border-white text-white placeholder-gray-300 py-3 pl-10 pr-4 rounded focus:outline-none focus:ring-2 focus:ring-white/50"
-            />
+              className="w-full bg-transparent border border-white text-white placeholder-gray-300 py-3 pl-10 pr-4 rounded focus:outline-none focus:ring-2 focus:ring-white/50"/>
           </div>
 
           <button 
             type="submit" 
-            className="bg-white text-[#0066cc] font-bold py-3 rounded mt-4 hover:bg-gray-100 transition-colors uppercase tracking-wider"
-          >
+            className="bg-white text-[#0066cc] font-bold py-3 rounded mt-4 hover:bg-gray-100 transition-colors uppercase tracking-wider">
             Sign In
           </button>
 
