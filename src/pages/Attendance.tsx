@@ -29,7 +29,6 @@ const SESSIONS = WEEKS.flatMap(week => [
 const ProfessorAttendanceView: React.FC = () => {
     const [markingMode, setMarkingMode] = useState(false);
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
-    // Don't load from localStorage on mount - always fetch fresh from DB based on current course/section
     const [attendanceData, setAttendanceData] = useState<Record<string, boolean>>({});
     const [showScanner, setShowScanner] = useState(false);
     const [showFingerprintUpload, setShowFingerprintUpload] = useState(false);
@@ -42,9 +41,9 @@ const ProfessorAttendanceView: React.FC = () => {
 
     const [profViewStudents, setProfViewStudents] = React.useState<Array<{id:string;name:string;absences:number;email?:string}>>([]);
 
-    // Request students list from server when section changes
+    
     React.useEffect(() => {
-        // ensure WS is connected (App should call connectWS on mount but double-check)
+        // Displays students while entering attendance window (professor)
         connectWS('127.0.0.1');
 
         const listener = (ev: MessageEvent) => {
@@ -75,10 +74,10 @@ const ProfessorAttendanceView: React.FC = () => {
 
         addMessageListener(listener);
 
-        // send request, retry until socket is open (max attempts)
+        // Requests backend to display students at attendance window (professor)
         const payload = { type: 'get_students_by_section', section: currentSection };
         let attempts = 0;
-        const maxAttempts = 40; // ~10s if interval 250ms
+        const maxAttempts = 40;
         const interval = setInterval(() => {
             const ws = getWS();
             if (ws && ws.readyState === WebSocket.OPEN) {
@@ -104,7 +103,7 @@ const ProfessorAttendanceView: React.FC = () => {
         };
     }, [currentSection]);
 
-    // Add listener for cert approval/rejection to refresh attendance for all weeks
+    // Requesting professors attendance page after cert send
     React.useEffect(() => {
         connectWS('127.0.0.1');
 
@@ -112,9 +111,7 @@ const ProfessorAttendanceView: React.FC = () => {
             try {
                 const msg = JSON.parse(ev.data) as any;
                 if (msg && (msg.type === 'certification_approval_response' || msg.type === 'certification_rejection_response')) {
-                    console.log('Cert approval/rejection detected - refreshing attendance');
-                    
-                    // Clear all attendance cache for current course
+                   
                     setAttendanceData(prev => {
                         const newData = { ...prev };
                         Object.keys(newData).forEach(key => {
@@ -126,7 +123,6 @@ const ProfessorAttendanceView: React.FC = () => {
                         return newData;
                     });
                     
-                    // Re-fetch all attendance data
                     setTimeout(() => {
                         const payload = {
                             type: 'get_attendance_data',
@@ -138,7 +134,6 @@ const ProfessorAttendanceView: React.FC = () => {
                         const ws = getWS();
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify(payload));
-                            console.log('Sent refresh request for all weeks');
                         }
                     }, 100);
                 }
@@ -151,15 +146,10 @@ const ProfessorAttendanceView: React.FC = () => {
         return () => removeMessageListener(certListener);
     }, [currentCourse, currentSection]);
 
-    // Note: Removed localStorage loading on mount for professors
-    // This ensures professors always see fresh data from the database
-    // Medical cert changes won't be visible in attendance until explicitly approved by the professor
-
-    // Automatically fetch attendance for ALL weeks/students at once when course/section changes
+    // Displaying professors attendance page after cert send
     React.useEffect(() => {
         console.log('Fetching all attendance data for:', currentCourse, currentSection);
         
-        // FIRST: Clear old data that doesn't match current course
         setAttendanceData(prev => {
             const newData: Record<string, boolean> = {};
             Object.keys(prev).forEach(key => {
@@ -188,7 +178,6 @@ const ProfessorAttendanceView: React.FC = () => {
                         setAttendanceData(prev => {
                             const newData = { ...prev };
                             
-                            // First, clear all old data for this course
                             Object.keys(newData).forEach(key => {
                                 if (key.endsWith(`-${currentCourse}`)) {
                                     delete newData[key];
@@ -219,7 +208,7 @@ const ProfessorAttendanceView: React.FC = () => {
             type: 'get_attendance_data',
             section: currentSection,
             course: currentCourse,
-            week: 'ALL' // Request all weeks at once
+            week: 'ALL' 
         };
 
         let attempts = 0;
@@ -258,13 +247,10 @@ const ProfessorAttendanceView: React.FC = () => {
     const allowedSections = ['CSE-23-01', 'CSE-23-02', 'CSE-23-03'];
 
     const toggleAttendance = (studentId: string, sessionLabel: string) => {
-        // Disable manual toggling - attendance should only be set by fingerprint upload
         return;
     };
 
     const handleSessionClick = (sessionId: string) => {
-        // Week selection is now automatic - no manual clicking needed
-        // This function is kept for marking mode only
         if (markingMode) {
             if (confirm("Stop marking current session and switch?")) {
                 setMarkingMode(false);
@@ -274,23 +260,17 @@ const ProfessorAttendanceView: React.FC = () => {
     };
 
     const handleStartMarking = () => {
-        // Auto-select first session if none selected
         if (!selectedSession) {
             setSelectedSession(SESSIONS[0].id);
         }
-        // Show fingerprint upload modal
         setShowFingerprintUpload(true);
     };
 
     const handleFingerprintUploadSuccess = (uploadedWeek: string) => {
-        // Close modal 
         setShowFingerprintUpload(false);
         
-        // Use the week that was selected in the modal for the upload
         const sessionLabel = uploadedWeek;
-        
-        console.log('handleFingerprintUploadSuccess called with uploadedWeek:', sessionLabel, 'section:', currentSection, 'course:', currentCourse);
-        
+                
         if (!sessionLabel) {
             console.error('No session label found');
             return;
@@ -302,7 +282,6 @@ const ProfessorAttendanceView: React.FC = () => {
             setSelectedSession(matchingSession.id);
         }
 
-        // Small delay to ensure modal is fully closed before fetching
         setTimeout(() => {
             // Fetch attendance data from DB for this week/course/section
             connectWS('127.0.0.1');
@@ -312,27 +291,20 @@ const ProfessorAttendanceView: React.FC = () => {
             const listener = (ev: MessageEvent) => {
                 try {
                     const msg = JSON.parse(ev.data) as any;
-                    console.log('Message received:', msg.type, msg);
                     
                     if (msg && msg.type === 'attendance_data') {
-                        console.log('Attendance data received, checking request_id match. Expected:', requestId, 'Got:', msg.request_id);
                         
-                        // Only process if request_id matches (or if msg has no request_id for backward compat)
                         if (msg.request_id === requestId || msg.request_id === undefined) {
-                            console.log('Request ID matched! Processing attendance data...');
                             
-                            // Populate attendanceData from DB - MERGE with existing data
                             if (msg.attendance && Array.isArray(msg.attendance)) {
                                 const newAttendanceData: Record<string, boolean> = { ...attendanceData };
                                 msg.attendance.forEach((record: any) => {
-                                    // Include course name in key to prevent cross-course data collision
                                     const key = `${record.student_id}-${record.session_label}-${record.course_name || currentCourse}`;
                                     // 0 = absent (true in our UI), 1 = present (false in our UI)
                                     newAttendanceData[key] = record.attendance === 0;
                                     console.log(`Set ${key} = ${record.attendance === 0} (attendance: ${record.attendance})`);
                                 });
                                 setAttendanceData(newAttendanceData);
-                                // Persist to localStorage
                                 localStorage.setItem('professorAttendanceData', JSON.stringify(newAttendanceData));
                                 console.log('Final attendance data state:', newAttendanceData);
                             } else {
@@ -390,7 +362,6 @@ const ProfessorAttendanceView: React.FC = () => {
                 }
             }, 250);
 
-            // Timeout fallback: if no response after 15s, log and cleanup
             const timeoutId = setTimeout(() => {
                 console.warn('Attendance fetch timeout (15s) - no response received');
                 removeMessageListener(listener);
@@ -521,7 +492,7 @@ const ProfessorAttendanceView: React.FC = () => {
                                 <div className="flex h-full">
                                     {SESSIONS.map(session => {
                                         const key = `${student.id}-${session.label}-${currentCourse}`;
-                                        const attendanceValue = attendanceData[key]; // true = absent (0), false = present (1), undefined = not set
+                                        const attendanceValue = attendanceData[key];
                                         const isActiveColumn = selectedSession === session.id;
                                         const hasAttendanceData = key in attendanceData;
                                         
@@ -568,13 +539,9 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
         const listener = (ev: MessageEvent) => {
             try {
                 const msg = JSON.parse(ev.data);
-                console.log('Student view - raw message received:', msg);
                 
                 if (msg && msg.type === 'student_attendance_data') {
-                    console.log('✓ Matched student_attendance_data message');
-                    console.log('Full student attendance response:', msg);
                     
-                    // Build attendance map: key = "course-week", value = attendance (0 or 1)
                     const attendanceMap: Record<string, number> = {};
                     const courseAbsences: Record<string, number> = {};
                     
@@ -583,9 +550,7 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                         msg.attendance.forEach((record: any) => {
                             const key = `${record.course_name}-${record.session_label}`;
                             attendanceMap[key] = record.attendance;
-                            
-                            console.log(`✓ Record added: key="${key}", attendance=${record.attendance}`);
-                            
+                                                        
                             // Count absences by course
                             if (record.attendance === 0) {
                                 courseAbsences[record.course_name] = (courseAbsences[record.course_name] || 0) + 1;
@@ -605,7 +570,7 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
                     }));
                     setStudentCourses(courses);
                     setIsLoading(false);
-                    console.log('✓ Student courses state updated:', courses);
+                    console.log('Student courses state updated:', courses);
                 }
             } catch (e) {
                 console.error('Error parsing message:', e);
@@ -621,7 +586,7 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
             section: user.section
         };
 
-        console.log('📤 Sending attendance request:', payload);
+        console.log('Sending attendance request:', payload);
 
         let attempts = 0;
         const maxAttempts = 50;
@@ -629,16 +594,13 @@ const StudentAttendanceView: React.FC<{ user: User }> = ({ user }) => {
             const ws = getWS();
             if (ws && ws.readyState === WebSocket.OPEN) {
                 try {
-                    console.log(`📡 WebSocket OPEN - sending request (attempt ${attempts + 1})`);
                     ws.send(JSON.stringify(payload));
                 } catch (e) {
-                    console.error('❌ Failed to send student attendance request', e);
+                    console.error('Failed to send student attendance request', e);
                 }
             } else {
                 attempts += 1;
-                console.log(`⏳ WebSocket not ready (state: ${ws?.readyState}), retry ${attempts}/${maxAttempts}`);
                 if (attempts >= maxAttempts) {
-                    console.error('❌ WebSocket not available after 50 attempts for student attendance');
                     setIsLoading(false);
                     return;
                 }

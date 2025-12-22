@@ -39,6 +39,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
   useEffect(() => {
     connectWS('127.0.0.1');
     
+    // DISPLAY CERTIFICATIONS
     const listener = (ev: MessageEvent) => {
       try {
         const msg = JSON.parse(ev.data);
@@ -67,7 +68,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
 
     addMessageListener(listener);
 
-    // Request pending certifications
+    // REQUEST CERTIFICATIONS
     const payload = { type: 'get_pending_certifications' };
     let attempts = 0;
     const maxAttempts = 40;
@@ -99,6 +100,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
     if (!selectedCert) return;
     setIsProcessing(true);
 
+    // Approve button selected
     const payload = {
       type: 'approve_certification',
       certification_id: selectedCert.id,
@@ -116,6 +118,7 @@ export const Inbox: React.FC<InboxProps> = ({ user }) => {
     if (!selectedCert) return;
     setIsProcessing(true);
 
+    // Reject button selected
     const payload = {
       type: 'reject_certification',
       certification_id: selectedCert.id,

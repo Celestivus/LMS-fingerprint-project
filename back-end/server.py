@@ -66,15 +66,18 @@ def compare_fingerprints(
 
 
 def convert_decimal_to_float(obj):
-    """Recursively convert Decimal and date objects to JSON-serializable types"""
     if isinstance(obj, Decimal):
         return float(obj)
     elif isinstance(obj, (datetime, date)):
         return obj.isoformat()
+    elif isinstance(obj, memoryview):
+        return base64.b64encode(obj.tobytes()).decode("utf-8")
+    elif isinstance(obj, bytes):
+        return base64.b64encode(obj).decode("utf-8")
     elif isinstance(obj, dict):
-        return {key: convert_decimal_to_float(val) for key, val in obj.items()}
+        return {k: convert_decimal_to_float(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
-        return [convert_decimal_to_float(item) for item in obj]
+        return [convert_decimal_to_float(i) for i in obj]
     return obj
 
 
@@ -709,17 +712,15 @@ async def handler(ws):
 
                             # Compare against each student's fingerprint
                             matched_student = None
-                            for student_id, full_name, db_fp_bytes in students:
-                                if db_fp_bytes is None:
+                            for student_id, full_name, db_fp in students:
+                                if db_fp is None:
                                     continue
+                                
+                                if isinstance(db_fp, memoryview):
+                                    db_fp = db_fp.tobytes()
 
-                                if compare_fingerprints(
-                                    fp_bytes, db_fp_bytes, threshold=0.99
-                                ):
+                                if compare_fingerprints(fp_bytes, db_fp, threshold=0.99):
                                     matched_student = (student_id, full_name)
-                                    print(
-                                        f"  >> Matched {filename} to {student_id} ({full_name})"
-                                    )
                                     break
 
                             if matched_student:
