@@ -66,18 +66,15 @@ def compare_fingerprints(
 
 
 def convert_decimal_to_float(obj):
+    """Recursively convert Decimal and date objects to JSON-serializable types"""
     if isinstance(obj, Decimal):
         return float(obj)
     elif isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    elif isinstance(obj, memoryview):
-        return base64.b64encode(obj.tobytes()).decode("utf-8")
-    elif isinstance(obj, bytes):
-        return base64.b64encode(obj).decode("utf-8")
     elif isinstance(obj, dict):
-        return {k: convert_decimal_to_float(v) for k, v in obj.items()}
+        return {key: convert_decimal_to_float(val) for key, val in obj.items()}
     elif isinstance(obj, (list, tuple)):
-        return [convert_decimal_to_float(i) for i in obj]
+        return [convert_decimal_to_float(item) for item in obj]
     return obj
 
 
@@ -397,48 +394,32 @@ async def handler(ws):
                 continue
 
             # Handle request for professors by department
-            if (
-                isinstance(data, dict)
-                and data.get("type") == "get_professors_by_department"
-            ):
+            if isinstance(data, dict) and data.get("type") == "get_professors_by_department":
                 department = data.get("department")
-                print(
-                    f">>> get_professors_by_department handler reached for department: {department}"
-                )
+                print(f">>> Received request for professors in department: {department}")
 
                 loop = asyncio.get_running_loop()
 
-                def fetch_professors(department):
+                def fetch_professors(dept):
                     try:
-                        print(f"  >> Connecting to DB for department {department}")
-                        conn = psycopg2.connect(
-                            host=DB_CONFIG["host"],
-                            database=DB_CONFIG["dbname"],
-                            user=DB_CONFIG["user"],
-                            password=DB_CONFIG["password"],
-                            port=DB_CONFIG["port"],
-                        )
+                        conn = psycopg2.connect(**DB_CONFIG)
                         cur = conn.cursor()
-                        cur.execute(
-                            "SELECT professor_id, full_name, department, email FROM Professors WHERE department = %s ORDER BY full_name",
-                            (department,),
-                        )
+                        cur.execute("""
+                                        SELECT professor_id, full_name, email
+                                        FROM Professors
+                                        WHERE department = %s
+                                        ORDER BY full_name
+                                    """, (dept,))
                         rows = cur.fetchall()
-                        print(f"  >> DB returned {len(rows)} rows")
-                        professors = []
-                        for r in rows:
-                            professors.append(
-                                {
-                                    "id": r[0],
-                                    "name": r[1],
-                                    "department": r[2],
-                                    "email": r[3],
-                                }
-                            )
-                        return {"success": True, "professors": professors}
+                        professors = [
+                            {"id": row[0], "name": row[1], "email": row[2] or "—", "department": dept}
+                            for row in rows
+                        ]
+                        print(f"  >> Found {len(professors)} professors in {dept}")
+                        return {"type": "professors_list", "professors": professors}
                     except Exception as e:
-                        print("  >> DB error fetching professors:", e)
-                        return {"success": False, "error": str(e)}
+                        print(f"  >> Error fetching professors: {e}")
+                        return {"type": "error", "message": str(e)}
                     finally:
                         try:
                             cur.close()
@@ -449,29 +430,8 @@ async def handler(ws):
                         except:
                             pass
 
-                result = await loop.run_in_executor(None, fetch_professors, department)
-                if result.get("success"):
-                    resp = {
-                        "type": "professors_list",
-                        "department": department,
-                        "professors": result.get("professors"),
-                    }
-                    print(
-                        f"Sending {len(result.get('professors', []))} professors for department {department}"
-                    )
-                else:
-                    resp = {
-                        "type": "professors_list",
-                        "department": department,
-                        "professors": [],
-                        "error": result.get("error"),
-                    }
-                    print(
-                        f"Error fetching professors for {department}: {result.get('error')}"
-                    )
-
-                print("Response:", json.dumps(resp))
-                await ws.send(json.dumps(resp))
+                response = await loop.run_in_executor(None, fetch_professors, department)
+                await ws.send(json.dumps(response))
                 continue
 
             # Handle request for student's own attendance data
@@ -712,15 +672,17 @@ async def handler(ws):
 
                             # Compare against each student's fingerprint
                             matched_student = None
-                            for student_id, full_name, db_fp in students:
-                                if db_fp is None:
+                            for student_id, full_name, db_fp_bytes in students:
+                                if db_fp_bytes is None:
                                     continue
-                                
-                                if isinstance(db_fp, memoryview):
-                                    db_fp = db_fp.tobytes()
 
-                                if compare_fingerprints(fp_bytes, db_fp, threshold=0.99):
+                                if compare_fingerprints(
+                                    fp_bytes, db_fp_bytes, threshold=0.99
+                                ):
                                     matched_student = (student_id, full_name)
+                                    print(
+                                        f"  >> Matched {filename} to {student_id} ({full_name})"
+                                    )
                                     break
 
                             if matched_student:
