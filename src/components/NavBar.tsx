@@ -69,9 +69,7 @@ export const NavBar: React.FC<NavBarProps> = ({ user, onLogout }) => {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Layout 2: Academic Affairs (University Name Header + Tabs)
-  // ---------------------------------------------------------------------------
   if (user.role === UserRole.ACADEMIC_AFFAIRS) {
     return (
         <div className="w-full bg-white">
@@ -103,9 +101,7 @@ export const NavBar: React.FC<NavBarProps> = ({ user, onLogout }) => {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Layout 3: SysAdmin (Simple Header)
-  // ---------------------------------------------------------------------------
   return (
     <div className="w-full border-b-2 border-black bg-gray-900 text-white">
         <div className="p-4 flex justify-between items-center">

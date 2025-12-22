@@ -48,6 +48,7 @@ export const MedicalCertificationModal: React.FC<MedicalCertificationModalProps>
             reader.onload = (event) => {
                 const fileData = event.target?.result as string;
                 
+                // Receiving response from server
                 const listener = (ev: MessageEvent) => {
                     try {
                         const msg = JSON.parse(ev.data);
@@ -74,6 +75,7 @@ export const MedicalCertificationModal: React.FC<MedicalCertificationModalProps>
 
                 addMessageListener(listener);
 
+                // Sending cert to update attendance result
                 const payload = {
                     type: 'upload_medical_certification',
                     student_id: studentId,

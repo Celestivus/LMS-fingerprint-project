@@ -39,6 +39,7 @@ export const SysAdmin: React.FC = () => {
       }
     };
 
+    // Sending request to get database tables
     const ws = getWS();
     if (ws) {
       addMessageListener(handleTablesResponse);

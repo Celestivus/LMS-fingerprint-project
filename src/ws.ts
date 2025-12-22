@@ -21,7 +21,6 @@ export function connectWS(serverIp: string) {
 
     socket.onmessage = (event) => {
         console.log("Received:", event.data);
-        // dispatch to registered listeners
         for (const l of listeners) {
             try { l(event); } catch (e) { console.error(e); }
         }
