@@ -1,15 +1,8 @@
 ## Prerequisites
-1. Node.js нужен для запуска React и Electron
+Node.js is needed to run React, Set up a single IP for the server and clients, then start the server and connect the clients to it
 ## How to Run
- 1. **первый для запуска сервера 
-    ```
+ 1.**For Server and Client
+  ```
+    npm init
     npm start
-    ```
-    *запуститься  http://localhost:8080*
-
-2.  **на втором терминале :
-    ```
-    npm install
-    npm run electron
-    ```
-
+  ```
